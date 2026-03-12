@@ -59,10 +59,10 @@ export default function TicketList() {
     setSelectedIds([]);
   };
 
-  const handleBatchAssign = () => {
+  const handleBatchAssign = (mode: 'assign' | 'pay' = 'assign') => {
     router.push({
       pathname: '/assign-ticket/batch',
-      params: { ids: selectedIds.join(','), eventId: id }
+      params: { ids: selectedIds.join(','), eventId: id, mode: mode }
     });
     cancelSelection();
   };
@@ -176,7 +176,7 @@ export default function TicketList() {
             <Text style={styles.headerBtnTextCancel}>Annuler</Text>
           </TouchableOpacity>
           <Text style={styles.selectionCount}>{selectedIds.length} sélectionnés</Text>
-          <TouchableOpacity onPress={handleBatchAssign}>
+          <TouchableOpacity onPress={() => handleBatchAssign('assign')}>
             <Text style={styles.headerBtnTextAssign}>Assigner</Text>
           </TouchableOpacity>
         </View>
@@ -228,6 +228,16 @@ export default function TicketList() {
         contentContainerStyle={styles.list}
         ListEmptyComponent={<Text style={styles.empty}>Aucun billet trouvé</Text>}
       />
+
+      {selectionMode && (
+        <TouchableOpacity 
+          style={styles.floatingPayBtn} 
+          onPress={() => handleBatchAssign('pay')}
+        >
+          <MaterialCommunityIcons name="cash-check" size={28} color="#FFF" />
+          <Text style={styles.floatingPayText}>PAYER ({selectedIds.length})</Text>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
@@ -282,5 +292,27 @@ const styles = StyleSheet.create({
   statusText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
   price: { fontSize: 16, fontWeight: 'bold', color: '#333' },
   remaining: { fontSize: 10, color: '#FF3B30', marginTop: 2 },
-  empty: { textAlign: 'center', marginTop: 50, color: '#999' }
+  empty: { textAlign: 'center', marginTop: 50, color: '#999' },
+  floatingPayBtn: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#34C759',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderRadius: 30,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    gap: 8
+  },
+  floatingPayText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold'
+  }
 });

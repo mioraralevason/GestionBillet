@@ -85,16 +85,17 @@ export const TicketService = {
     } catch (error) { return false; }
   },
 
-  updateTicketsBatch: (ids: number[], data: { buyer_name: string, buyer_phone: string, pay_total?: boolean }): boolean => {
+  updateTicketsBatch: (data: { 
+    buyer_name: string, 
+    buyer_phone: string, 
+    items: { id: number, amount: number }[] 
+  }): boolean => {
     try {
       const buyerId = BuyerService.addBuyer({ name: data.buyer_name, phone: data.buyer_phone });
       if (!buyerId) return false;
 
-      for (const id of ids) {
-        const ticket = TicketService.getTicketById(id);
-        if (!ticket) continue;
-        const amountToPay = data.pay_total ? ticket.price : 0;
-        TicketService.assignTicket(id, data.buyer_name, data.buyer_phone, amountToPay);
+      for (const item of data.items) {
+        TicketService.assignTicket(item.id, data.buyer_name, data.buyer_phone, item.amount);
       }
       return true;
     } catch (error) { return false; }
@@ -103,6 +104,13 @@ export const TicketService = {
   updateStatus: (id: number, statusId: number): boolean => {
     try {
       db.runSync(`UPDATE tickets SET status_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, statusId, id);
+      return true;
+    } catch (error) { return false; }
+  },
+
+  cancelPayments: (ticketId: number): boolean => {
+    try {
+      db.runSync(`DELETE FROM payments WHERE ticket_id = ?`, ticketId);
       return true;
     } catch (error) { return false; }
   },

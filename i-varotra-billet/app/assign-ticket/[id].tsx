@@ -22,6 +22,9 @@ export default function AssignTicket() {
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
 
+  const [tempAmount, setTempAmount] = useState('');
+  const [showPayModal, setShowPayModal] = useState(false);
+
   const fetchData = useCallback(() => {
     const t = TicketService.getTicketById(ticketId);
     if (t) {
@@ -56,14 +59,14 @@ export default function AssignTicket() {
     setNewPhone('');
   };
 
-  const handleSave = () => {
+  const handleSave = (finalAmount?: string) => {
     if (!ticket) return;
     if (!buyerName) {
       Alert.alert('Erreur', 'Veuillez sélectionner ou créer un acheteur.');
       return;
     }
 
-    const paid = parseFloat(amountPaid) || 0;
+    const paid = parseFloat(finalAmount !== undefined ? finalAmount : amountPaid) || 0;
     
     const success = TicketService.assignTicket(
       ticketId,
@@ -73,11 +76,33 @@ export default function AssignTicket() {
     );
 
     if (success) {
-      Alert.alert('Succès', 'Billet assigné avec succès.');
-      router.back();
+      Alert.alert('Succès', 'Opération effectuée avec succès.');
+      fetchData(); // Rafraîchir les données pour afficher le nouveau statut
     } else {
-      Alert.alert('Erreur', 'Impossible d\'assigner le billet.');
+      Alert.alert('Erreur', 'Impossible d\'effectuer l\'opération.');
     }
+  };
+
+  const handleCancelPayment = () => {
+    Alert.alert(
+      'Annuler les paiements',
+      'Voulez-vous vraiment supprimer TOUS les paiements associés à ce billet ?',
+      [
+        { text: 'Non', style: 'cancel' },
+        { 
+          text: 'Oui, annuler', 
+          style: 'destructive',
+          onPress: () => {
+            if (TicketService.cancelPayments(ticketId)) {
+              Alert.alert('Succès', 'Paiements annulés.');
+              fetchData();
+            } else {
+              Alert.alert('Erreur', 'Impossible d\'annuler les paiements.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (!ticket) return <View style={styles.center}><Text>Billet non trouvé</Text></View>;
@@ -86,6 +111,7 @@ export default function AssignTicket() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.ticketHeader}>
+          <Text style={styles.headerTitle}>Détails Billet</Text>
           <Text style={styles.ticketNum}>{ticket.ticket_number}</Text>
           <Text style={styles.ticketPrice}>Prix: {ticket.price} Ar</Text>
         </View>
@@ -151,27 +177,97 @@ export default function AssignTicket() {
         ) : null}
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Montant payé (Ar)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Montant encaissé"
-            keyboardType="numeric"
-            value={amountPaid}
-            onChangeText={setAmountPaid}
-          />
-          {parseFloat(amountPaid) < ticket.price && (
-            <Text style={styles.remaining}>Reste à payer: {ticket.price - (parseFloat(amountPaid) || 0)} Ar</Text>
+          <Text style={styles.label}>Statut du paiement</Text>
+          {parseFloat(amountPaid) >= ticket.price ? (
+            <View style={styles.paidBadge}>
+              <MaterialCommunityIcons name="check-circle" size={24} color="#34C759" />
+              <Text style={styles.paidText}>PAYÉ ({amountPaid} Ar)</Text>
+            </View>
+          ) : (
+            <>
+              <TextInput
+                style={[styles.input, { backgroundColor: '#E9ECEF', color: '#666' }]}
+                value={amountPaid}
+                editable={false}
+              />
+              <Text style={styles.remaining}>Reste à payer: {ticket.price - (parseFloat(amountPaid) || 0)} Ar</Text>
+            </>
           )}
         </View>
 
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+        <TouchableOpacity style={styles.saveButton} onPress={() => handleSave()}>
           <MaterialCommunityIcons name="content-save-check" size={24} color="#FFF" />
           <Text style={styles.saveButtonText}>Enregistrer l'assignation</Text>
         </TouchableOpacity>
 
+        {parseFloat(amountPaid) < ticket.price && (
+          <TouchableOpacity 
+            style={[styles.saveButton, { backgroundColor: '#34C759' }]} 
+            onPress={() => {
+              const remaining = ticket.price - (parseFloat(amountPaid) || 0);
+              setTempAmount(remaining.toString());
+              setShowPayModal(true);
+            }}
+          >
+            <MaterialCommunityIcons name="cash-plus" size={24} color="#FFF" />
+            <Text style={styles.saveButtonText}>Payer</Text>
+          </TouchableOpacity>
+        )}
+
+        {parseFloat(amountPaid) > 0 && (
+          <TouchableOpacity 
+            style={styles.cancelPaymentBtn} 
+            onPress={handleCancelPayment}
+          >
+            <MaterialCommunityIcons name="cash-remove" size={20} color="#FF3B30" />
+            <Text style={styles.cancelPaymentText}>Annuler les paiements</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
           <Text style={styles.cancelButtonText}>Annuler</Text>
         </TouchableOpacity>
+
+        {/* Modal pour le paiement */}
+        <Modal visible={showPayModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Montant à payer</Text>
+              <Text style={{ textAlign: 'center', marginBottom: 15, color: '#FF3B30', fontWeight: 'bold' }}>
+                Reste à payer: {ticket.price - (parseFloat(amountPaid) || 0)} Ar
+              </Text>
+              <TextInput 
+                style={styles.input} 
+                placeholder="Montant" 
+                keyboardType="numeric"
+                value={tempAmount}
+                onChangeText={setTempAmount}
+                autoFocus
+              />
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.btnCancel} onPress={() => setShowPayModal(false)}>
+                  <Text style={styles.btnTextCancel}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.btnAdd} 
+                  onPress={() => {
+                    const remaining = ticket.price - (parseFloat(amountPaid) || 0);
+                    const amount = parseFloat(tempAmount) || 0;
+                    if (amount > remaining) {
+                      Alert.alert('Attention', `Le montant dépasse le reste à payer (${remaining} Ar). Le paiement sera ajusté au reste.`);
+                      handleSave(remaining.toString());
+                    } else {
+                      handleSave(amount.toString());
+                    }
+                    setShowPayModal(false);
+                  }}
+                >
+                  <Text style={styles.btnTextAdd}>Confirmer le paiement</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         <Modal visible={showAddModal} transparent animationType="slide">
           <View style={styles.modalOverlay}>
@@ -211,6 +307,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { padding: 20 },
   ticketHeader: { marginBottom: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#EEE', alignItems: 'center' },
+  headerTitle: { fontSize: 18, color: '#666', marginBottom: 10, fontWeight: '600' },
   ticketNum: { fontSize: 24, fontWeight: 'bold', color: '#007AFF' },
   ticketPrice: { fontSize: 16, color: '#666', marginTop: 5 },
   formGroup: { marginBottom: 20 },
@@ -225,9 +322,13 @@ const styles = StyleSheet.create({
   addNewOption: { padding: 15, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#EEE' },
   addNewText: { color: '#007AFF', fontWeight: 'bold', fontSize: 16 },
   selectedBuyerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5E9', padding: 15, borderRadius: 10, marginBottom: 20 },
+  paidBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5E9', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#34C759' },
+  paidText: { color: '#34C759', fontWeight: 'bold', fontSize: 16, marginLeft: 10 },
   remaining: { fontSize: 13, color: '#FF3B30', marginTop: 5, fontWeight: '600' },
   saveButton: { backgroundColor: '#007AFF', flexDirection: 'row', borderRadius: 12, padding: 18, alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10 },
   saveButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  cancelPaymentBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 15, marginTop: 15, borderStyle: 'dashed', borderWidth: 1, borderColor: '#FF3B30', borderRadius: 10, gap: 8 },
+  cancelPaymentText: { color: '#FF3B30', fontSize: 15, fontWeight: '600' },
   cancelButton: { padding: 15, alignItems: 'center', marginTop: 10 },
   cancelButtonText: { color: '#FF3B30', fontSize: 16 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },

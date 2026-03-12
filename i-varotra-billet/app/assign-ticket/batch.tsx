@@ -1,20 +1,23 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { TicketService } from '../../services/TicketService';
+import { TicketService, Ticket } from '../../services/TicketService';
 import { BuyerService, Buyer } from '../../services/BuyerService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function BatchAssign() {
-  const { ids, eventId } = useLocalSearchParams();
+  const { ids, eventId, mode } = useLocalSearchParams();
   const router = useRouter();
   const ticketIds = (ids as string).split(',').map(id => parseInt(id));
 
+  const [selectedTickets, setSelectedTickets] = useState<Ticket[]>([]);
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [buyerName, setBuyerName] = useState('');
   const [buyerPhone, setBuyerPhone] = useState('');
   const [showBuyerList, setShowBuyerList] = useState(false);
   const [buyerSearch, setBuyerSearch] = useState('');
+
+  const [amounts, setAmounts] = useState<Record<number, string>>({});
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
@@ -22,7 +25,31 @@ export default function BatchAssign() {
 
   useFocusEffect(useCallback(() => { 
     setBuyers(BuyerService.getBuyers()); 
-  }, []));
+    const fetched = ticketIds.map(id => TicketService.getTicketById(id)).filter(t => t !== null) as Ticket[];
+    setSelectedTickets(fetched);
+    
+    const initialAmounts: Record<number, string> = {};
+    fetched.forEach(t => {
+      if (mode === 'pay') {
+        initialAmounts[t.id!] = t.price.toString();
+      } else {
+        initialAmounts[t.id!] = '0';
+      }
+    });
+    setAmounts(initialAmounts);
+  }, [ids, mode]));
+
+  const updateAmount = (id: number, val: string) => {
+    setAmounts(prev => ({ ...prev, [id]: val }));
+  };
+
+  const setAllToPaid = () => {
+    const newAmounts: Record<number, string> = {};
+    selectedTickets.forEach(t => {
+      newAmounts[t.id!] = t.price.toString();
+    });
+    setAmounts(newAmounts);
+  };
 
   const filteredBuyers = buyers.filter(b => 
     b.name.toLowerCase().includes(buyerSearch.toLowerCase())
@@ -44,19 +71,24 @@ export default function BatchAssign() {
     setNewPhone('');
   };
 
-  const handleAction = (action: 'assign' | 'pay') => {
+  const handleAction = () => {
     if (!buyerName.trim()) {
       Alert.alert('Erreur', 'Veuillez choisir un acheteur.');
       return;
     }
 
+    const items = selectedTickets.map(t => ({
+      id: t.id!,
+      amount: parseFloat(amounts[t.id!] || '0')
+    }));
+
     const data = {
       buyer_name: buyerName.trim(),
       buyer_phone: buyerPhone.trim(),
-      pay_total: action === 'pay'
+      items: items
     };
 
-    if (TicketService.updateTicketsBatch(ticketIds, data)) {
+    if (TicketService.updateTicketsBatch(data)) {
       Alert.alert('Succès', 'Billets mis à jour avec succès.');
       router.back();
     } else {
@@ -68,7 +100,10 @@ export default function BatchAssign() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Text style={styles.title}>{ticketIds.length} Billets sélectionnés</Text>
+          <Text style={styles.title}>
+            {mode === 'assign' ? 'Assignation Groupée' : 'Paiement Groupé'}
+          </Text>
+          <Text style={styles.subtitle}>{ticketIds.length} Billets sélectionnés</Text>
         </View>
 
         <View style={styles.formGroup}>
@@ -128,15 +163,46 @@ export default function BatchAssign() {
           </View>
         ) : null}
 
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.assignBtn} onPress={() => handleAction('assign')}>
-            <MaterialCommunityIcons name="account-check" size={24} color="#FFF" />
-            <Text style={styles.btnText}>Assigner uniquement</Text>
-          </TouchableOpacity>
+        {mode === 'pay' && (
+          <View style={styles.ticketsSection}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={styles.label}>Détails des paiements</Text>
+              <TouchableOpacity onPress={setAllToPaid}>
+                <Text style={{ color: '#007AFF', fontWeight: 'bold' }}>Tout payer totalement</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {selectedTickets.map(t => (
+              <View key={t.id} style={styles.ticketItem}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.ticketNum}>{t.ticket_number}</Text>
+                  <Text style={styles.ticketPrice}>{t.price} Ar</Text>
+                </View>
+                <TextInput
+                  style={styles.amountInput}
+                  keyboardType="numeric"
+                  placeholder="Montant"
+                  value={amounts[t.id!] || ''}
+                  onChangeText={(val) => updateAmount(t.id!, val)}
+                />
+              </View>
+            ))}
+          </View>
+        )}
 
-          <TouchableOpacity style={styles.payBtn} onPress={() => handleAction('pay')}>
-            <MaterialCommunityIcons name="cash-check" size={24} color="#FFF" />
-            <Text style={styles.btnText}>Assigner et Payer Totalement</Text>
+        <View style={styles.actions}>
+          <TouchableOpacity 
+            style={[styles.assignBtn, mode === 'pay' && { backgroundColor: '#34C759' }]} 
+            onPress={handleAction}
+          >
+            <MaterialCommunityIcons 
+              name={mode === 'assign' ? "account-check" : "cash-check"} 
+              size={24} 
+              color="#FFF" 
+            />
+            <Text style={styles.btnText}>
+              {mode === 'assign' ? "Confirmer l'assignation" : "Confirmer le paiement"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -182,6 +248,7 @@ const styles = StyleSheet.create({
   scroll: { padding: 20 },
   header: { marginBottom: 20, alignItems: 'center' },
   title: { fontSize: 22, fontWeight: 'bold', color: '#007AFF' },
+  subtitle: { fontSize: 14, color: '#666', marginTop: 4 },
   formGroup: { marginBottom: 20 },
   label: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 },
   input: { backgroundColor: '#F3F4F6', padding: 15, borderRadius: 10, fontSize: 16 },
@@ -194,9 +261,13 @@ const styles = StyleSheet.create({
   addNewOption: { padding: 15, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#EEE' },
   addNewText: { color: '#007AFF', fontWeight: 'bold', fontSize: 16 },
   selectedBuyerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5E9', padding: 15, borderRadius: 10, marginBottom: 20 },
+  ticketsSection: { marginBottom: 30 },
+  ticketItem: { flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#F9F9F9', borderRadius: 10, marginBottom: 8, borderWidth: 1, borderColor: '#EEE' },
+  ticketNum: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+  ticketPrice: { fontSize: 13, color: '#666' },
+  amountInput: { backgroundColor: '#FFF', width: 100, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#CCC', textAlign: 'right', fontSize: 16 },
   actions: { gap: 15, marginTop: 10 },
   assignBtn: { backgroundColor: '#007AFF', padding: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  payBtn: { backgroundColor: '#34C759', padding: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
   cancelBtn: { marginTop: 20, padding: 15, alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
