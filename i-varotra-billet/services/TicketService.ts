@@ -127,6 +127,19 @@ export const TicketService = {
     } catch (error) { return false; }
   },
 
+  resetTicketsVerificationBatch: (ticketIds: number[]): boolean => {
+    try {
+      const placeholders = ticketIds.map(() => '?').join(',');
+      db.runSync(
+        `UPDATE tickets SET status_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`,
+        TicketService.STATUS_VENDU,
+        ...ticketIds
+      );
+      db.runSync(`DELETE FROM attendance WHERE ticket_id IN (${placeholders})`, ...ticketIds);
+      return true;
+    } catch (error) { return false; }
+  },
+
   getEventStats: (eventId: number) => {
     try {
       const row: any = db.getFirstSync(

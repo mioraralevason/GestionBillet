@@ -17,6 +17,7 @@ export default function TicketList() {
   
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   const fetchTickets = useCallback(() => {
     const list = TicketService.getTicketsByEvent(id);
@@ -49,6 +50,32 @@ export default function TicketList() {
               Alert.alert('Succès', 'La vérification a été réinitialisée.');
             } else {
               Alert.alert('Erreur', 'Impossible de réinitialiser la vérification.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleBatchResetVerification = () => {
+    setShowMoreMenu(false);
+    if (role !== 'admin') return;
+
+    Alert.alert(
+      'Réinitialiser les vérifications',
+      `Voulez-vous vraiment annuler la validation des ${selectedIds.length} billets sélectionnés ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Réinitialiser', 
+          style: 'destructive',
+          onPress: () => {
+            if (TicketService.resetTicketsVerificationBatch(selectedIds)) {
+              fetchTickets();
+              cancelSelection();
+              Alert.alert('Succès', 'Les vérifications ont été réinitialisées.');
+            } else {
+              Alert.alert('Erreur', 'Impossible de réinitialiser les vérifications.');
             }
           }
         }
@@ -215,13 +242,32 @@ export default function TicketList() {
     <SafeAreaView style={styles.container}>
       {selectionMode ? (
         <View style={styles.selectionHeader}>
-          <TouchableOpacity onPress={cancelSelection}>
-            <Text style={styles.headerBtnTextCancel}>Annuler</Text>
+          <TouchableOpacity onPress={cancelSelection} style={styles.headerIconBtn}>
+            <MaterialCommunityIcons name="close" size={24} color="#FF3B30" />
           </TouchableOpacity>
+          
           <Text style={styles.selectionCount}>{selectedIds.length} sélectionnés</Text>
-          <TouchableOpacity onPress={() => handleBatchAssign('assign')}>
-            <Text style={styles.headerBtnTextAssign}>Assigner</Text>
-          </TouchableOpacity>
+          
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity onPress={() => handleBatchAssign('assign')} style={{ marginRight: 15 }}>
+              <Text style={styles.headerBtnTextAssign}>Assigner</Text>
+            </TouchableOpacity>
+            
+            {role === 'admin' && (
+              <TouchableOpacity onPress={() => setShowMoreMenu(!showMoreMenu)} style={styles.headerIconBtn}>
+                <MaterialCommunityIcons name="dots-vertical" size={24} color="#333" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {showMoreMenu && (
+            <View style={styles.moreMenu}>
+              <TouchableOpacity style={styles.menuItem} onPress={handleBatchResetVerification}>
+                <MaterialCommunityIcons name="refresh" size={20} color="#FF9500" />
+                <Text style={styles.menuText}>Réinitialiser vérification</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       ) : (
         <View style={styles.searchContainer}>
@@ -292,15 +338,43 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between', 
     alignItems: 'center', 
     backgroundColor: '#FFF', 
-    padding: 15, 
+    padding: 10, 
     borderBottomWidth: 1, 
     borderBottomColor: '#EEE',
     elevation: 3,
-    zIndex: 10
+    zIndex: 1000,
+    height: 60
   },
+  headerIconBtn: { padding: 5 },
   headerBtnTextCancel: { color: '#FF3B30', fontSize: 16, fontWeight: '600' },
   headerBtnTextAssign: { color: '#007AFF', fontSize: 16, fontWeight: 'bold' },
   selectionCount: { fontSize: 18, fontWeight: 'bold' },
+  moreMenu: {
+    position: 'absolute',
+    top: 55,
+    right: 10,
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    zIndex: 2000,
+    minWidth: 200,
+    borderWidth: 1,
+    borderColor: '#EEE'
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    gap: 10
+  },
+  menuText: {
+    fontSize: 16,
+    color: '#333'
+  },
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', margin: 15, padding: 10, borderRadius: 10, elevation: 1 },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 16 },
   suggestionsList: { 
