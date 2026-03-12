@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, Keyboard } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, Keyboard, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { TicketService, Ticket } from '../../services/TicketService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function TicketList() {
   const { eventId } = useLocalSearchParams();
@@ -10,6 +11,7 @@ export default function TicketList() {
   const id = parseInt(eventId as string);
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [role, setRole] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   
@@ -24,8 +26,35 @@ export default function TicketList() {
   useFocusEffect(
     useCallback(() => {
       fetchTickets();
+      const getRole = async () => {
+        const userRole = await AsyncStorage.getItem('userRole');
+        setRole(userRole);
+      };
+      getRole();
     }, [fetchTickets])
   );
+
+  const handleResetVerification = (ticket: Ticket) => {
+    Alert.alert(
+      'Réinitialiser la vérification',
+      `Voulez-vous vraiment annuler la validation du billet ${ticket.ticket_number} ? Il redeviendra "Vendu".`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Réinitialiser', 
+          style: 'destructive',
+          onPress: () => {
+            if (TicketService.resetTicketVerification(ticket.id!)) {
+              fetchTickets();
+              Alert.alert('Succès', 'La vérification a été réinitialisée.');
+            } else {
+              Alert.alert('Erreur', 'Impossible de réinitialiser la vérification.');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const toggleSelection = (ticketId: number) => {
     setSelectedIds(prev => {
@@ -151,6 +180,20 @@ export default function TicketList() {
               />
             )}
             <Text style={styles.ticketNum}>{item.ticket_number}</Text>
+            {statusText.toLowerCase().includes('validé') && (
+              <View style={styles.verifiedBadge}>
+                <MaterialCommunityIcons name="check-decagram" size={16} color="#34C759" />
+                <Text style={styles.verifiedLabel}>Vérifié</Text>
+                {role === 'admin' && (
+                  <TouchableOpacity 
+                    style={styles.resetBtn} 
+                    onPress={() => handleResetVerification(item)}
+                  >
+                    <MaterialCommunityIcons name="refresh" size={14} color="#007AFF" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
           <Text style={styles.buyerName}>{item.buyer_name || 'Disponible'}</Text>
         </View>
@@ -286,6 +329,29 @@ const styles = StyleSheet.create({
   selectedCard: { backgroundColor: '#E1F0FF', borderColor: '#007AFF', borderWidth: 1 },
   ticketLeft: { flex: 1 },
   ticketNum: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  verifiedBadge: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginLeft: 8, 
+    backgroundColor: '#E8F5E9', 
+    paddingHorizontal: 6, 
+    paddingVertical: 2, 
+    borderRadius: 4 
+  },
+  verifiedLabel: { 
+    fontSize: 10, 
+    color: '#34C759', 
+    fontWeight: 'bold', 
+    marginLeft: 4 
+  },
+  resetBtn: {
+    marginLeft: 10,
+    backgroundColor: '#FFF',
+    padding: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#007AFF'
+  },
   buyerName: { fontSize: 14, color: '#666', marginTop: 4 },
   ticketRight: { alignItems: 'flex-end' },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginBottom: 5 },

@@ -115,6 +115,18 @@ export const TicketService = {
     } catch (error) { return false; }
   },
 
+  resetTicketVerification: (ticketId: number): boolean => {
+    try {
+      db.runSync(
+        `UPDATE tickets SET status_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        TicketService.STATUS_VENDU,
+        ticketId
+      );
+      db.runSync(`DELETE FROM attendance WHERE ticket_id = ?`, ticketId);
+      return true;
+    } catch (error) { return false; }
+  },
+
   getEventStats: (eventId: number) => {
     try {
       const row: any = db.getFirstSync(

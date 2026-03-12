@@ -25,6 +25,8 @@ export default function Verifier() {
 
     if (validation.success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else if (validation.warning) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
@@ -72,13 +74,16 @@ export default function Verifier() {
 
       <Modal visible={result !== null} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, result?.success ? styles.successBg : styles.errorBg]}>
+          <View style={[
+            styles.modalContent, 
+            result?.success ? styles.successBg : (result?.warning ? styles.warningBg : styles.errorBg)
+          ]}>
             <MaterialCommunityIcons 
-              name={result?.success ? "check-circle" : "alert-circle"} 
+              name={result?.success ? "check-circle" : (result?.warning ? "alert" : "alert-circle")} 
               size={80} 
               color="#FFF" 
             />
-            <Text style={styles.modalTitle}>{result?.success ? "VALIDE" : "INVALIDE"}</Text>
+            <Text style={styles.modalTitle}>{result?.success ? "VALIDE" : (result?.warning ? "DÉJÀ UTILISÉ" : "INVALIDE")}</Text>
             <Text style={styles.modalMessage}>{result?.message}</Text>
             
             {result?.ticket && (
@@ -112,6 +117,7 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', padding: 20 },
   modalContent: { borderRadius: 20, padding: 30, alignItems: 'center' },
   successBg: { backgroundColor: '#34C759' },
+  warningBg: { backgroundColor: '#FF9500' },
   errorBg: { backgroundColor: '#FF3B30' },
   modalTitle: { color: '#FFF', fontSize: 24, fontWeight: 'bold', marginVertical: 10 },
   modalMessage: { color: '#FFF', fontSize: 18, textAlign: 'center', marginBottom: 20 },

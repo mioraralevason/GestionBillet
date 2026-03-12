@@ -5,16 +5,19 @@ export interface ValidationResult {
   success: boolean;
   message: string;
   ticket?: any;
+  warning?: boolean;
 }
 
 export const AttendanceService = {
   validateTicket: (qrCode: string): ValidationResult => {
     try {
       const ticket: any = db.getFirstSync(
-        `SELECT t.*, e.name as event_name, s.name as status_name
+        `SELECT t.*, e.name as event_name, s.name as status_name, b.name as buyer_name,
+         (SELECT SUM(amount) FROM payments WHERE ticket_id = t.id) as total_paid
          FROM tickets t 
          JOIN events e ON t.event_id = e.id 
          LEFT JOIN status s ON t.status_id = s.id
+         LEFT JOIN buyers b ON t.buyer_id = b.id
          WHERE t.qr_code = ?`,
         qrCode
       );
@@ -23,10 +26,22 @@ export const AttendanceService = {
         return { success: false, message: 'Billet inexistant' };
       }
 
+      // 1. Vérifier si le billet est déjà validé
       if (ticket.status_id === TicketService.STATUS_VALIDE) {
-        return { success: false, message: 'Billet déjà utilisé', ticket };
+        return { success: false, message: 'Billet déjà utilisé / vérifié', ticket, warning: true };
       }
 
+      // 2. Vérifier si le billet est payé
+      const totalPaid = ticket.total_paid || 0;
+      if (totalPaid < ticket.price) {
+        return { 
+          success: false, 
+          message: `Billet non payé entièrement (${totalPaid} / ${ticket.price} Ar). Entrée refusée.`, 
+          ticket 
+        };
+      }
+
+      // 3. Valider le billet
       db.runSync(
         `UPDATE tickets SET status_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         TicketService.STATUS_VALIDE,
