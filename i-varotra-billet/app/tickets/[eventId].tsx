@@ -59,7 +59,7 @@ export default function TicketList() {
 
   const handleBatchResetVerification = () => {
     setShowMoreMenu(false);
-    if (role !== 'admin') return;
+    if (role !== 'admin' && role !== 'verificateur') return;
 
     Alert.alert(
       'Réinitialiser les vérifications',
@@ -211,7 +211,7 @@ export default function TicketList() {
               <View style={styles.verifiedBadge}>
                 <MaterialCommunityIcons name="check-decagram" size={16} color="#34C759" />
                 <Text style={styles.verifiedLabel}>Vérifié</Text>
-                {role === 'admin' && (
+                {(role === 'admin' || role === 'verificateur') && (
                   <TouchableOpacity 
                     style={styles.resetBtn} 
                     onPress={() => handleResetVerification(item)}
@@ -249,11 +249,13 @@ export default function TicketList() {
           <Text style={styles.selectionCount}>{selectedIds.length} sélectionnés</Text>
           
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => handleBatchAssign('assign')} style={{ marginRight: 15 }}>
-              <Text style={styles.headerBtnTextAssign}>Assigner</Text>
-            </TouchableOpacity>
-            
             {role === 'admin' && (
+              <TouchableOpacity onPress={() => handleBatchAssign('assign')} style={{ marginRight: 15 }}>
+                <Text style={styles.headerBtnTextAssign}>Assigner</Text>
+              </TouchableOpacity>
+            )}
+            
+            {(role === 'admin' || role === 'verificateur') && (
               <TouchableOpacity onPress={() => setShowMoreMenu(!showMoreMenu)} style={styles.headerIconBtn}>
                 <MaterialCommunityIcons name="dots-vertical" size={24} color="#333" />
               </TouchableOpacity>
@@ -318,7 +320,7 @@ export default function TicketList() {
         ListEmptyComponent={<Text style={styles.empty}>Aucun billet trouvé</Text>}
       />
 
-      {selectionMode && (
+      {selectionMode && role === 'admin' && (
         <TouchableOpacity 
           style={styles.floatingPayBtn} 
           onPress={() => handleBatchAssign('pay')}

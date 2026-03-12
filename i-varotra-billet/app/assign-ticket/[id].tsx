@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TicketService, Ticket } from '../../services/TicketService';
 import { BuyerService, Buyer } from '../../services/BuyerService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -12,6 +13,7 @@ export default function AssignTicket() {
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [buyers, setBuyers] = useState<Buyer[]>([]);
+  const [role, setRole] = useState<string | null>(null);
   const [buyerName, setBuyerName] = useState('');
   const [buyerPhone, setBuyerPhone] = useState('');
   const [amountPaid, setAmountPaid] = useState('');
@@ -25,7 +27,10 @@ export default function AssignTicket() {
   const [tempAmount, setTempAmount] = useState('');
   const [showPayModal, setShowPayModal] = useState(false);
 
-  const fetchData = useCallback(() => {
+  const fetchData = useCallback(async () => {
+    const userRole = await AsyncStorage.getItem('userRole');
+    setRole(userRole);
+
     const t = TicketService.getTicketById(ticketId);
     if (t) {
       setTicket(t);
@@ -118,17 +123,23 @@ export default function AssignTicket() {
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>Acheteur</Text>
-          <TouchableOpacity 
-            style={styles.dropdown} 
-            onPress={() => setShowBuyerList(!showBuyerList)}
-          >
-            <Text style={{ color: buyerName ? '#333' : '#999', fontSize: 16 }}>
-              {buyerName || "Rechercher ou ajouter..."}
-            </Text>
-            <MaterialCommunityIcons name={showBuyerList ? "chevron-up" : "chevron-down"} size={20} color="#666" />
-          </TouchableOpacity>
+          {role === 'admin' ? (
+            <TouchableOpacity 
+              style={styles.dropdown} 
+              onPress={() => setShowBuyerList(!showBuyerList)}
+            >
+              <Text style={{ color: buyerName ? '#333' : '#999', fontSize: 16 }}>
+                {buyerName || "Rechercher ou ajouter..."}
+              </Text>
+              <MaterialCommunityIcons name={showBuyerList ? "chevron-up" : "chevron-down"} size={20} color="#666" />
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.input, { backgroundColor: '#F3F4F6' }]}>
+              <Text style={{ color: '#333', fontSize: 16 }}>{buyerName || 'Non assigné'}</Text>
+            </View>
+          )}
 
-          {showBuyerList && (
+          {role === 'admin' && showBuyerList && (
             <View style={styles.buyerListDropdown}>
               <View style={styles.searchDropdownWrapper}>
                 <MaterialCommunityIcons name="magnify" size={18} color="#999" />
@@ -163,7 +174,7 @@ export default function AssignTicket() {
           )}
         </View>
 
-        {buyerName ? (
+        {buyerName && role === 'admin' ? (
           <View style={styles.selectedBuyerCard}>
             <MaterialCommunityIcons name="account-check" size={24} color="#34C759" />
             <View style={{ marginLeft: 10, flex: 1 }}>
@@ -178,7 +189,7 @@ export default function AssignTicket() {
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>Statut du paiement</Text>
-          {parseFloat(amountPaid) >= ticket.price ? (
+          {parseFloat(amountPaid) >= (ticket?.price || 0) ? (
             <View style={styles.paidBadge}>
               <MaterialCommunityIcons name="check-circle" size={24} color="#34C759" />
               <Text style={styles.paidText}>PAYÉ ({amountPaid} Ar)</Text>
@@ -190,17 +201,21 @@ export default function AssignTicket() {
                 value={amountPaid}
                 editable={false}
               />
-              <Text style={styles.remaining}>Reste à payer: {ticket.price - (parseFloat(amountPaid) || 0)} Ar</Text>
+              {ticket && (
+                <Text style={styles.remaining}>Reste à payer: {ticket.price - (parseFloat(amountPaid) || 0)} Ar</Text>
+              )}
             </>
           )}
         </View>
 
-        <TouchableOpacity style={styles.saveButton} onPress={() => handleSave()}>
-          <MaterialCommunityIcons name="content-save-check" size={24} color="#FFF" />
-          <Text style={styles.saveButtonText}>Enregistrer l'assignation</Text>
-        </TouchableOpacity>
+        {role === 'admin' && (
+          <TouchableOpacity style={styles.saveButton} onPress={() => handleSave()}>
+            <MaterialCommunityIcons name="content-save-check" size={24} color="#FFF" />
+            <Text style={styles.saveButtonText}>Enregistrer l'assignation</Text>
+          </TouchableOpacity>
+        )}
 
-        {parseFloat(amountPaid) < ticket.price && (
+        {role === 'admin' && parseFloat(amountPaid) < ticket.price && (
           <TouchableOpacity 
             style={[styles.saveButton, { backgroundColor: '#34C759' }]} 
             onPress={() => {
@@ -214,13 +229,23 @@ export default function AssignTicket() {
           </TouchableOpacity>
         )}
 
-        {parseFloat(amountPaid) > 0 && (
+        {role === 'admin' && parseFloat(amountPaid) > 0 && (
           <TouchableOpacity 
             style={styles.cancelPaymentBtn} 
             onPress={handleCancelPayment}
           >
             <MaterialCommunityIcons name="cash-remove" size={20} color="#FF3B30" />
             <Text style={styles.cancelPaymentText}>Annuler les paiements</Text>
+          </TouchableOpacity>
+        )}
+
+        {(role === 'admin' || role === 'verificateur') && ticket.status_id === TicketService.STATUS_VALIDE && (
+          <TouchableOpacity 
+            style={[styles.saveButton, { backgroundColor: '#FF9500' }]} 
+            onPress={() => handleResetVerification(ticket)}
+          >
+            <MaterialCommunityIcons name="refresh" size={24} color="#FFF" />
+            <Text style={styles.saveButtonText}>Réinitialiser vérification</Text>
           </TouchableOpacity>
         )}
 

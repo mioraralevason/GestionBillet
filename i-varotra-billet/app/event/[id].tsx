@@ -6,6 +6,7 @@ import { EventService, Event } from '../../services/EventService';
 import { TicketService } from '../../services/TicketService';
 import { PdfService } from '../../services/PdfService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function EventDetails() {
   const { id } = useLocalSearchParams();
@@ -15,12 +16,16 @@ export default function EventDetails() {
   const [event, setEvent] = useState<Event | null>(null);
   const [stats, setStats] = useState({ total: 0, available: 0, sold: 0, validated: 0 });
   const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<string | null>(null);
   
   const [ticketCount, setTicketCount] = useState('');
   const [ticketPrice, setTicketPrice] = useState('');
   const [exporting, setExporting] = useState(false);
 
-  const fetchData = useCallback(() => {
+  const fetchData = useCallback(async () => {
+    const userRole = await AsyncStorage.getItem('userRole');
+    setRole(userRole);
+    
     const ev = EventService.getEvents().find(e => e.id === eventId);
     if (ev) {
       setEvent(ev);
@@ -97,38 +102,40 @@ export default function EventDetails() {
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Générer des billets</Text>
-        <View style={styles.row}>
-          <View style={{ flex: 1, marginRight: 10 }}>
-            <Text style={styles.label}>Quantité</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 50"
-              keyboardType="numeric"
-              value={ticketCount}
-              onChangeText={setTicketCount}
-            />
+      {role === 'admin' && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Générer des billets</Text>
+          <View style={styles.row}>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={styles.label}>Quantité</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 50"
+                keyboardType="numeric"
+                value={ticketCount}
+                onChangeText={setTicketCount}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Prix (Ar)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 20000"
+                keyboardType="numeric"
+                value={ticketPrice}
+                onChangeText={setTicketPrice}
+              />
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Prix (Ar)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 20000"
-              keyboardType="numeric"
-              value={ticketPrice}
-              onChangeText={setTicketPrice}
-            />
-          </View>
+          <TouchableOpacity style={styles.button} onPress={handleGenerate}>
+            <MaterialCommunityIcons name="ticket-plus" size={20} color="#FFF" />
+            <Text style={styles.buttonText}>Créer les billets</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.button} onPress={handleGenerate}>
-          <MaterialCommunityIcons name="ticket-plus" size={20} color="#FFF" />
-          <Text style={styles.buttonText}>Créer les billets</Text>
-        </TouchableOpacity>
-      </View>
+      )}
 
       <TouchableOpacity 
-        style={[styles.card, { backgroundColor: '#34C759', marginTop: 0 }]} 
+        style={[styles.card, { backgroundColor: '#34C759', marginTop: role === 'admin' ? 0 : 20 }]} 
         onPress={handleExportPdf}
         disabled={exporting}
       >
