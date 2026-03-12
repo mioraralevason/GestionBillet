@@ -1,4 +1,3 @@
-// app/add-event.tsx
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -37,7 +36,7 @@ export default function AddEvent() {
 
     const newEvent = {
       name: name.trim(),
-      date: formatDate(date),
+      event_date: date.toISOString().split('T')[0], // On stocke la date au format ISO YYYY-MM-DD
       slogan: slogan.trim(),
       description: description.trim(),
     };
@@ -82,7 +81,7 @@ export default function AddEvent() {
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={onDateChange}
-              minimumDate={new Date()} // Empêcher les dates passées
+              minimumDate={new Date()}
             />
           )}
         </View>

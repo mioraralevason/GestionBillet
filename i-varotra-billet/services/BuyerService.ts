@@ -1,12 +1,11 @@
-// services/BuyerService.ts
 import db from '../database/database';
 
 export interface Buyer {
   id?: number;
   name: string;
   phone?: string;
-  email?: string;
   created_at?: string;
+  updated_at?: string;
 }
 
 export const BuyerService = {
@@ -21,11 +20,19 @@ export const BuyerService = {
 
   addBuyer: (buyer: Buyer): number | null => {
     try {
-      const result = db.runSync(
-        `INSERT INTO buyers (name, phone, email, created_at) VALUES (?, ?, ?, datetime('now'))`,
+      // On cherche d'abord si l'acheteur existe déjà par nom et téléphone
+      const existing: any = db.getFirstSync(
+        `SELECT id FROM buyers WHERE name = ? AND phone = ?`,
         buyer.name,
-        buyer.phone || '',
-        buyer.email || ''
+        buyer.phone || ''
+      );
+      
+      if (existing) return existing.id;
+
+      const result = db.runSync(
+        `INSERT INTO buyers (name, phone) VALUES (?, ?)`,
+        buyer.name,
+        buyer.phone || ''
       );
       return result.lastInsertRowId;
     } catch (error) {
@@ -38,24 +45,19 @@ export const BuyerService = {
     if (!buyer.id) return false;
     try {
       db.runSync(
-        `UPDATE buyers SET name = ?, phone = ?, email = ? WHERE id = ?`,
+        `UPDATE buyers SET name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         buyer.name,
         buyer.phone || '',
-        buyer.email || '',
         buyer.id
       );
       return true;
-    } catch (error) {
-      return false;
-    }
+    } catch (error) { return false; }
   },
 
   deleteBuyer: (id: number): boolean => {
     try {
       db.runSync(`DELETE FROM buyers WHERE id = ?`, id);
       return true;
-    } catch (error) {
-      return false;
-    }
+    } catch (error) { return false; }
   }
 };

@@ -1,38 +1,36 @@
-// services/EventService.ts
 import db from '../database/database';
 
 export interface Event {
   id?: number;
   name?: string;
-  date: string;
+  event_date: string;
   description?: string;
   slogan?: string;
-  image_uri?: string;
+  image?: string;
   created_at?: string;
+  updated_at?: string;
 }
 
 export const EventService = {
-  // Récupérer tous les événements
   getEvents: (): Event[] => {
     try {
-      return db.getAllSync(`SELECT * FROM events ORDER BY date DESC`);
+      return db.getAllSync(`SELECT * FROM events ORDER BY event_date DESC`);
     } catch (error) {
       console.error('Erreur lors de la récupération des événements', error);
       return [];
     }
   },
 
-  // Ajouter un événement
   addEvent: (event: Event): number | null => {
     try {
       const result = db.runSync(
-        `INSERT INTO events (name, date, description, slogan, image_uri, created_at) 
-         VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+        `INSERT INTO events (name, event_date, description, slogan, image) 
+         VALUES (?, ?, ?, ?, ?)`,
         event.name || '',
-        event.date,
+        event.event_date,
         event.description || '',
         event.slogan || '',
-        event.image_uri || ''
+        event.image || ''
       );
       return result.lastInsertRowId;
     } catch (error) {
@@ -41,18 +39,17 @@ export const EventService = {
     }
   },
 
-  // Modifier un événement
   updateEvent: (event: Event): boolean => {
     if (!event.id) return false;
     try {
       db.runSync(
-        `UPDATE events SET name = ?, date = ?, description = ?, slogan = ?, image_uri = ? 
+        `UPDATE events SET name = ?, event_date = ?, description = ?, slogan = ?, image = ?, updated_at = CURRENT_TIMESTAMP 
          WHERE id = ?`,
         event.name || '',
-        event.date,
+        event.event_date,
         event.description || '',
         event.slogan || '',
-        event.image_uri || '',
+        event.image || '',
         event.id
       );
       return true;
@@ -62,7 +59,6 @@ export const EventService = {
     }
   },
 
-  // Supprimer un événement
   deleteEvent: (id: number): boolean => {
     try {
       db.runSync(`DELETE FROM events WHERE id = ?`, id);

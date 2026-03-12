@@ -1,4 +1,3 @@
-// app/tickets/[eventId].tsx
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -13,7 +12,6 @@ export default function TicketList() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [search, setSearch] = useState('');
   
-  // État pour la sélection
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
@@ -51,7 +49,6 @@ export default function TicketList() {
     if (selectionMode) {
       toggleSelection(ticket.id!);
     } else {
-      // Si déjà vendu, on pourra gérer le paiement direct ou l'édition
       router.push(`/assign-ticket/${ticket.id}`);
     }
   };
@@ -74,17 +71,18 @@ export default function TicketList() {
     (t.buyer_name && t.buyer_name.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case 'disponible': return '#8E8E93';
-      case 'vendu': return '#007AFF';
-      case 'validé': return '#34C759';
-      default: return '#8E8E93';
-    }
+  const getStatusColor = (statusName?: string) => {
+    const name = statusName?.toLowerCase() || '';
+    if (name.includes('disponible')) return '#8E8E93';
+    if (name.includes('vendu')) return '#007AFF';
+    if (name.includes('validé')) return '#34C759';
+    return '#8E8E93';
   };
 
   const renderItem = ({ item }: { item: Ticket }) => {
     const isSelected = selectedIds.includes(item.id!);
+    const statusText = item.status_name || 'Inconnu';
+    const totalPaid = item.total_paid || 0;
     
     return (
       <TouchableOpacity 
@@ -112,12 +110,12 @@ export default function TicketList() {
         </View>
         
         <View style={styles.ticketRight}>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-            <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(statusText) }]}>
+            <Text style={styles.statusText}>{statusText.toUpperCase()}</Text>
           </View>
           <Text style={styles.price}>{item.price} Ar</Text>
-          {item.amount_paid! < item.price && item.status === 'vendu' && (
-            <Text style={styles.remaining}>Reste: {item.price - item.amount_paid!} Ar</Text>
+          {totalPaid < item.price && statusText.toLowerCase().includes('vendu') && (
+            <Text style={styles.remaining}>Reste: {item.price - totalPaid} Ar</Text>
           )}
         </View>
       </TouchableOpacity>

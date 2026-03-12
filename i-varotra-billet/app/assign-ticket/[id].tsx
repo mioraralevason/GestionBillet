@@ -1,4 +1,3 @@
-// app/assign-ticket/[id].tsx
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -13,14 +12,12 @@ export default function AssignTicket() {
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [buyers, setBuyers] = useState<Buyer[]>([]);
-  const [buyerId, setBuyerId] = useState<number | null>(null);
   const [buyerName, setBuyerName] = useState('');
   const [buyerPhone, setBuyerPhone] = useState('');
   const [amountPaid, setAmountPaid] = useState('');
   const [showBuyerList, setShowBuyerList] = useState(false);
   const [buyerSearch, setBuyerSearch] = useState('');
   
-  // États pour la création rapide d'acheteur
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
@@ -29,10 +26,9 @@ export default function AssignTicket() {
     const t = TicketService.getTicketById(ticketId);
     if (t) {
       setTicket(t);
-      setBuyerId(t.buyer_id || null);
       setBuyerName(t.buyer_name || '');
       setBuyerPhone(t.buyer_phone || '');
-      setAmountPaid(t.amount_paid?.toString() || '0');
+      setAmountPaid(t.total_paid?.toString() || '0');
     }
     setBuyers(BuyerService.getBuyers());
   }, [ticketId]);
@@ -44,7 +40,6 @@ export default function AssignTicket() {
   );
 
   const selectBuyer = (b: Buyer) => {
-    setBuyerId(b.id || null);
     setBuyerName(b.name);
     setBuyerPhone(b.phone || '');
     setShowBuyerList(false);
@@ -53,40 +48,35 @@ export default function AssignTicket() {
 
   const handleQuickAddBuyer = () => {
     if (!newName.trim()) return;
-    const newId = BuyerService.addBuyer({ name: newName, phone: newPhone });
-    if (newId) {
-      const b = { id: newId, name: newName, phone: newPhone };
-      selectBuyer(b);
-      setShowAddModal(false);
-      setNewName('');
-      setNewPhone('');
-      fetchData(); // Rafraîchir la liste globale
-    }
+    
+    setBuyerName(newName.trim());
+    setBuyerPhone(newPhone.trim());
+    setShowAddModal(false);
+    setNewName('');
+    setNewPhone('');
   };
 
   const handleSave = () => {
     if (!ticket) return;
     if (!buyerName) {
-      Alert.alert('Erreur', 'Veuillez sélectionner un acheteur.');
+      Alert.alert('Erreur', 'Veuillez sélectionner ou créer un acheteur.');
       return;
     }
 
     const paid = parseFloat(amountPaid) || 0;
     
-    const updatedTicket: Ticket = {
-      ...ticket,
-      buyer_id: buyerId,
-      buyer_name: buyerName.trim(),
-      buyer_phone: buyerPhone.trim(),
-      amount_paid: paid,
-      status: paid > 0 || buyerName.trim() ? 'vendu' : 'disponible'
-    };
+    const success = TicketService.assignTicket(
+      ticketId,
+      buyerName.trim(),
+      buyerPhone.trim(),
+      paid
+    );
 
-    if (TicketService.updateTicket(updatedTicket)) {
-      Alert.alert('Succès', 'Billet mis à jour.');
+    if (success) {
+      Alert.alert('Succès', 'Billet assigné avec succès.');
       router.back();
     } else {
-      Alert.alert('Erreur', 'Mise à jour impossible.');
+      Alert.alert('Erreur', 'Impossible d\'assigner le billet.');
     }
   };
 
@@ -101,13 +91,13 @@ export default function AssignTicket() {
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Choisir un acheteur</Text>
+          <Text style={styles.label}>Acheteur</Text>
           <TouchableOpacity 
             style={styles.dropdown} 
             onPress={() => setShowBuyerList(!showBuyerList)}
           >
             <Text style={{ color: buyerName ? '#333' : '#999', fontSize: 16 }}>
-              {buyerName || "Rechercher une personne..."}
+              {buyerName || "Rechercher ou ajouter..."}
             </Text>
             <MaterialCommunityIcons name={showBuyerList ? "chevron-up" : "chevron-down"} size={20} color="#666" />
           </TouchableOpacity>
@@ -125,26 +115,24 @@ export default function AssignTicket() {
                 />
               </View>
               
-              {filteredBuyers.length === 0 ? (
-                <TouchableOpacity 
-                  style={styles.addNewOption} 
-                  onPress={() => {
-                    setNewName(buyerSearch);
-                    setShowAddModal(true);
-                    setShowBuyerList(false);
-                  }}
-                >
-                  <MaterialCommunityIcons name="account-plus" size={24} color="#007AFF" />
-                  <Text style={styles.addNewText}>Ajouter "{buyerSearch}"</Text>
+              <TouchableOpacity 
+                style={styles.addNewOption} 
+                onPress={() => {
+                  setNewName(buyerSearch);
+                  setShowAddModal(true);
+                  setShowBuyerList(false);
+                }}
+              >
+                <MaterialCommunityIcons name="account-plus" size={24} color="#007AFF" />
+                <Text style={styles.addNewText}>Nouvel acheteur</Text>
+              </TouchableOpacity>
+
+              {filteredBuyers.map(b => (
+                <TouchableOpacity key={b.id} style={styles.buyerOption} onPress={() => selectBuyer(b)}>
+                  <Text style={styles.buyerNameText}>{b.name}</Text>
+                  {b.phone && <Text style={{ fontSize: 12, color: '#999' }}>{b.phone}</Text>}
                 </TouchableOpacity>
-              ) : (
-                filteredBuyers.map(b => (
-                  <TouchableOpacity key={b.id} style={styles.buyerOption} onPress={() => selectBuyer(b)}>
-                    <Text style={styles.buyerNameText}>{b.name}</Text>
-                    {b.phone && <Text style={{ fontSize: 12, color: '#999' }}>{b.phone}</Text>}
-                  </TouchableOpacity>
-                ))
-              )}
+              ))}
             </View>
           )}
         </View>
@@ -152,10 +140,13 @@ export default function AssignTicket() {
         {buyerName ? (
           <View style={styles.selectedBuyerCard}>
             <MaterialCommunityIcons name="account-check" size={24} color="#34C759" />
-            <View style={{ marginLeft: 10 }}>
+            <View style={{ marginLeft: 10, flex: 1 }}>
               <Text style={{ fontWeight: 'bold' }}>{buyerName}</Text>
               {buyerPhone && <Text style={{ fontSize: 12, color: '#666' }}>{buyerPhone}</Text>}
             </View>
+            <TouchableOpacity onPress={() => { setBuyerName(''); setBuyerPhone(''); }}>
+              <MaterialCommunityIcons name="close-circle" size={20} color="#FF3B30" />
+            </TouchableOpacity>
           </View>
         ) : null}
 
@@ -175,14 +166,13 @@ export default function AssignTicket() {
 
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
           <MaterialCommunityIcons name="content-save-check" size={24} color="#FFF" />
-          <Text style={styles.saveButtonText}>Enregistrer</Text>
+          <Text style={styles.saveButtonText}>Enregistrer l'assignation</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
           <Text style={styles.cancelButtonText}>Annuler</Text>
         </TouchableOpacity>
 
-        {/* Modal Création Rapide Acheteur */}
         <Modal visible={showAddModal} transparent animationType="slide">
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
@@ -194,7 +184,7 @@ export default function AssignTicket() {
                 onChangeText={setNewName}
               />
               <TextInput 
-                style={styles.input} 
+                style={[styles.input, { marginTop: 10 }]} 
                 placeholder="Téléphone" 
                 keyboardType="phone-pad"
                 value={newPhone}
@@ -205,7 +195,7 @@ export default function AssignTicket() {
                   <Text style={styles.btnTextCancel}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.btnAdd} onPress={handleQuickAddBuyer}>
-                  <Text style={styles.btnTextAdd}>Créer et Assigner</Text>
+                  <Text style={styles.btnTextAdd}>Confirmer</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -232,10 +222,9 @@ const styles = StyleSheet.create({
   searchDropdownInput: { flex: 1, marginLeft: 8, fontSize: 14, height: 40 },
   buyerOption: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
   buyerNameText: { fontSize: 16, fontWeight: '500' },
-  addNewOption: { padding: 20, flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center' },
+  addNewOption: { padding: 15, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#EEE' },
   addNewText: { color: '#007AFF', fontWeight: 'bold', fontSize: 16 },
   selectedBuyerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5E9', padding: 15, borderRadius: 10, marginBottom: 20 },
-  noBuyer: { padding: 15, color: '#999', textAlign: 'center' },
   remaining: { fontSize: 13, color: '#FF3B30', marginTop: 5, fontWeight: '600' },
   saveButton: { backgroundColor: '#007AFF', flexDirection: 'row', borderRadius: 12, padding: 18, alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10 },
   saveButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
@@ -244,7 +233,7 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
   modalContent: { backgroundColor: '#FFF', borderRadius: 15, padding: 20 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
   btnCancel: { flex: 1, padding: 15, alignItems: 'center' },
   btnTextCancel: { color: '#FF3B30', fontSize: 16 },
   btnAdd: { flex: 2, backgroundColor: '#007AFF', padding: 15, borderRadius: 8, alignItems: 'center' },
