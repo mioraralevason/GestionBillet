@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { EventService, Event } from '../../services/EventService';
 import { TicketService } from '../../services/TicketService';
+import { PdfService } from '../../services/PdfService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function EventDetails() {
@@ -17,6 +18,7 @@ export default function EventDetails() {
   
   const [ticketCount, setTicketCount] = useState('');
   const [ticketPrice, setTicketPrice] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const fetchData = useCallback(() => {
     const ev = EventService.getEvents().find(e => e.id === eventId);
@@ -50,6 +52,23 @@ export default function EventDetails() {
     } else {
       Alert.alert('Erreur', 'Échec de la génération.');
     }
+  };
+
+  const handleExportPdf = async () => {
+    if (!event) return;
+    setExporting(true);
+    const tickets = TicketService.getTicketsByEvent(eventId);
+    if (tickets.length === 0) {
+      Alert.alert('Information', 'Aucun billet à exporter.');
+      setExporting(false);
+      return;
+    }
+
+    const success = await PdfService.exportTicketsToPdf(event, tickets);
+    if (!success) {
+      Alert.alert('Erreur', 'Impossible de générer le PDF.');
+    }
+    setExporting(false);
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" /></View>;
@@ -107,6 +126,21 @@ export default function EventDetails() {
           <Text style={styles.buttonText}>Créer les billets</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity 
+        style={[styles.card, { backgroundColor: '#34C759', marginTop: 0 }]} 
+        onPress={handleExportPdf}
+        disabled={exporting}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+          {exporting ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <MaterialCommunityIcons name="file-pdf-box" size={24} color="#FFF" />
+          )}
+          <Text style={[styles.buttonText, { color: '#FFF' }]}>Exporter en PDF (A4 - 3x3)</Text>
+        </View>
+      </TouchableOpacity>
 
       <TouchableOpacity 
         style={[styles.card, styles.viewTickets]}
