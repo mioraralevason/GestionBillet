@@ -4,7 +4,9 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TicketService, Ticket } from '../../services/TicketService';
 import { BuyerService, Buyer } from '../../services/BuyerService';
+import { AttendanceService, ValidationResult } from '../../services/AttendanceService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 export default function AssignTicket() {
   const { id } = useLocalSearchParams();
@@ -26,6 +28,8 @@ export default function AssignTicket() {
 
   const [tempAmount, setTempAmount] = useState('');
   const [showPayModal, setShowPayModal] = useState(false);
+
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
 
   const fetchData = useCallback(async () => {
     const userRole = await AsyncStorage.getItem('userRole');
@@ -86,6 +90,44 @@ export default function AssignTicket() {
     } else {
       Alert.alert('Erreur', 'Impossible d\'effectuer l\'opération.');
     }
+  };
+
+  const handleVerify = () => {
+    if (!ticket) return;
+    
+    const res = AttendanceService.verifyTicketById(ticketId);
+    setValidationResult(res);
+
+    if (res.success) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      fetchData();
+    } else if (res.warning) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
+
+  const handleResetVerification = (t: Ticket) => {
+    Alert.alert(
+      'Réinitialiser la vérification',
+      `Voulez-vous vraiment annuler la validation du billet ${t.ticket_number} ? Il redeviendra "Vendu".`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Réinitialiser',
+          style: 'destructive',
+          onPress: () => {
+            if (TicketService.resetTicketVerification(t.id!)) {
+              fetchData();
+              Alert.alert('Succès', 'La vérification a été réinitialisée.');
+            } else {
+              Alert.alert('Erreur', 'Impossible de réinitialiser la vérification.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleCancelPayment = () => {
@@ -239,6 +281,16 @@ export default function AssignTicket() {
           </TouchableOpacity>
         )}
 
+        {(role === 'admin' || role === 'verificateur') && ticket.status_id !== TicketService.STATUS_VALIDE && (
+          <TouchableOpacity 
+            style={[styles.saveButton, { backgroundColor: '#34C759' }]} 
+            onPress={handleVerify}
+          >
+            <MaterialCommunityIcons name="check-decagram" size={24} color="#FFF" />
+            <Text style={styles.saveButtonText}>Vérifier Billet</Text>
+          </TouchableOpacity>
+        )}
+
         {(role === 'admin' || role === 'verificateur') && ticket.status_id === TicketService.STATUS_VALIDE && (
           <TouchableOpacity 
             style={[styles.saveButton, { backgroundColor: '#FF9500' }]} 
@@ -252,6 +304,36 @@ export default function AssignTicket() {
         <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
           <Text style={styles.cancelButtonText}>Annuler</Text>
         </TouchableOpacity>
+
+        {/* Modal de Résultat de Vérification (comme le scanner) */}
+        <Modal visible={validationResult !== null} transparent animationType="fade">
+          <View style={styles.modalOverlayResult}>
+            <View style={[
+              styles.modalContentResult, 
+              validationResult?.success ? styles.successBg : (validationResult?.warning ? styles.warningBg : styles.errorBg)
+            ]}>
+              <MaterialCommunityIcons 
+                name={validationResult?.success ? "check-circle" : (validationResult?.warning ? "alert" : "alert-circle")} 
+                size={80} 
+                color="#FFF" 
+              />
+              <Text style={styles.modalTitleResult}>{validationResult?.success ? "VALIDE" : (validationResult?.warning ? "DÉJÀ UTILISÉ" : "INVALIDE")}</Text>
+              <Text style={styles.modalMessageResult}>{validationResult?.message}</Text>
+              
+              {validationResult?.ticket && (
+                <View style={styles.ticketInfoResult}>
+                  <Text style={styles.ticketTextResult}>Billet: {validationResult.ticket.ticket_number}</Text>
+                  <Text style={styles.ticketTextResult}>Événement: {validationResult.ticket.event_name}</Text>
+                  <Text style={styles.ticketTextResult}>Acheteur: {validationResult.ticket.buyer_name || 'Inconnu'}</Text>
+                </View>
+              )}
+
+              <TouchableOpacity style={styles.closeButtonResult} onPress={() => setValidationResult(null)}>
+                <Text style={styles.closeButtonTextResult}>Fermer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
         {/* Modal pour le paiement */}
         <Modal visible={showPayModal} transparent animationType="fade">
@@ -363,5 +445,18 @@ const styles = StyleSheet.create({
   btnCancel: { flex: 1, padding: 15, alignItems: 'center' },
   btnTextCancel: { color: '#FF3B30', fontSize: 16 },
   btnAdd: { flex: 2, backgroundColor: '#007AFF', padding: 15, borderRadius: 8, alignItems: 'center' },
-  btnTextAdd: { color: '#FFF', fontSize: 16, fontWeight: 'bold' }
+  btnTextAdd: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+
+  // Styles pour le modal de résultat (copiés de verifier.tsx)
+  modalOverlayResult: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', padding: 20 },
+  modalContentResult: { borderRadius: 20, padding: 30, alignItems: 'center' },
+  successBg: { backgroundColor: '#34C759' },
+  warningBg: { backgroundColor: '#FF9500' },
+  errorBg: { backgroundColor: '#FF3B30' },
+  modalTitleResult: { color: '#FFF', fontSize: 24, fontWeight: 'bold', marginVertical: 10 },
+  modalMessageResult: { color: '#FFF', fontSize: 18, textAlign: 'center', marginBottom: 20 },
+  ticketInfoResult: { backgroundColor: 'rgba(255,255,255,0.2)', padding: 15, borderRadius: 10, width: '100%', marginBottom: 20 },
+  ticketTextResult: { color: '#FFF', fontSize: 14, marginBottom: 5 },
+  closeButtonResult: { backgroundColor: '#FFF', paddingHorizontal: 30, paddingVertical: 15, borderRadius: 12 },
+  closeButtonTextResult: { color: '#333', fontSize: 16, fontWeight: 'bold' },
 });
