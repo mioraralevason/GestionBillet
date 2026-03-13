@@ -30,12 +30,22 @@ export default function TabsLayout() {
         }} 
       />
       <Tabs.Screen 
+        name="calendar" 
+        options={{ 
+          title: 'Calendrier',
+          href: role === 'verificateur' ? null : '/(tabs)/calendar',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="calendar-month" color={color} size={size} />
+          ),
+        }} 
+      />
+      <Tabs.Screen 
         name="events" 
         options={{ 
           title: 'Événements',
           href: role === 'verificateur' ? null : '/(tabs)/events',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="calendar" color={color} size={size} />
+            <MaterialCommunityIcons name="format-list-bulleted" color={color} size={size} />
           ),
         }} 
       />

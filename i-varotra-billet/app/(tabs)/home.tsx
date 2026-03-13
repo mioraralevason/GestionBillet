@@ -138,13 +138,20 @@ export default function Home() {
                 <Text style={styles.shortcutLabel}>Scanner</Text>
               </TouchableOpacity>
 
+              <TouchableOpacity style={styles.shortcutItem} onPress={() => router.push('/calendar')}>
+                <View style={[styles.shortcutIcon, { backgroundColor: '#5AC8FA' }]}>
+                  <MaterialCommunityIcons name="calendar-month" size={24} color="#FFF" />
+                </View>
+                <Text style={styles.shortcutLabel}>Calendrier</Text>
+              </TouchableOpacity>
+
               {role === 'admin' && (
                 <>
                   <TouchableOpacity style={styles.shortcutItem} onPress={() => router.push('/events')}>
                     <View style={[styles.shortcutIcon, { backgroundColor: '#5856D6' }]}>
-                      <MaterialCommunityIcons name="calendar" size={24} color="#FFF" />
+                      <MaterialCommunityIcons name="format-list-bulleted" size={24} color="#FFF" />
                     </View>
-                    <Text style={styles.shortcutLabel}>Événements</Text>
+                    <Text style={styles.shortcutLabel}>Liste</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.shortcutItem} onPress={() => router.push('/buyers')}>
                     <View style={[styles.shortcutIcon, { backgroundColor: '#AF52DE' }]}>
