@@ -1,17 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { EventService } from '../services/EventService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 export default function AddEvent() {
   const router = useRouter();
+  const { id } = useLocalSearchParams();
+  const eventId = id ? parseInt(id as string) : null;
+  const isEditing = !!eventId;
+
   const [name, setName] = useState('');
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [slogan, setSlogan] = useState('');
   const [description, setDescription] = useState('');
+
+  useEffect(() => {
+    if (isEditing) {
+      const event = EventService.getEvents().find(e => e.id === eventId);
+      if (event) {
+        setName(event.name || '');
+        if (event.event_date) {
+          setDate(new Date(event.event_date));
+        }
+        setSlogan(event.slogan || '');
+        setDescription(event.description || '');
+      }
+    }
+  }, [eventId, isEditing]);
 
   const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowDatePicker(false);
@@ -34,19 +52,29 @@ export default function AddEvent() {
       return;
     }
 
-    const newEvent = {
+    const eventData = {
+      id: eventId || undefined,
       name: name.trim(),
       event_date: date.toISOString().split('T')[0], // On stocke la date au format ISO YYYY-MM-DD
       slogan: slogan.trim(),
       description: description.trim(),
     };
 
-    const id = EventService.addEvent(newEvent);
-    if (id) {
-      Alert.alert('Succès', 'Événement créé avec succès !');
-      router.back();
+    if (isEditing) {
+      if (EventService.updateEvent(eventData)) {
+        Alert.alert('Succès', 'Événement mis à jour avec succès !');
+        router.back();
+      } else {
+        Alert.alert('Erreur', "Impossible de mettre à jour l'événement.");
+      }
     } else {
-      Alert.alert('Erreur', "Impossible de créer l'événement.");
+      const id = EventService.addEvent(eventData);
+      if (id) {
+        Alert.alert('Succès', 'Événement créé avec succès !');
+        router.back();
+      } else {
+        Alert.alert('Erreur', "Impossible de créer l'événement.");
+      }
     }
   };
 
@@ -55,6 +83,11 @@ export default function AddEvent() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
+      <Stack.Screen 
+        options={{ 
+          headerTitle: isEditing ? 'Modifier l\'Événement' : 'Nouvel Événement' 
+        }} 
+      />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.formGroup}>
           <Text style={styles.label}>Nom de l'événement *</Text>
@@ -81,7 +114,7 @@ export default function AddEvent() {
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={onDateChange}
-              minimumDate={new Date()}
+              minimumDate={isEditing ? undefined : new Date()}
             />
           )}
         </View>
@@ -110,7 +143,9 @@ export default function AddEvent() {
 
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
           <MaterialCommunityIcons name="check-circle" size={24} color="#FFF" />
-          <Text style={styles.saveButtonText}>Enregistrer l'événement</Text>
+          <Text style={styles.saveButtonText}>
+            {isEditing ? 'Enregistrer les modifications' : 'Enregistrer l\'événement'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>

@@ -10,7 +10,8 @@ export default function BuyersList() {
   const [search, setSearch] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   
-  // États pour le nouvel acheteur
+  // États pour le nouvel acheteur / édition
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
 
@@ -25,19 +26,44 @@ export default function BuyersList() {
     }, [fetchBuyers])
   );
 
-  const handleAddBuyer = () => {
+  const openModal = (buyer?: Buyer) => {
+    if (buyer) {
+      setEditingId(buyer.id!);
+      setName(buyer.name);
+      setPhone(buyer.phone || '');
+    } else {
+      setEditingId(null);
+      setName('');
+      setPhone('');
+    }
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setEditingId(null);
+    setName('');
+    setPhone('');
+  };
+
+  const handleSaveBuyer = () => {
     if (!name.trim()) {
       Alert.alert('Erreur', 'Le nom est obligatoire.');
       return;
     }
 
-    if (BuyerService.addBuyer({ name, phone })) {
-      setName('');
-      setPhone('');
-      setModalVisible(false);
+    let success = false;
+    if (editingId) {
+      success = BuyerService.updateBuyer({ id: editingId, name, phone });
+    } else {
+      success = !!BuyerService.addBuyer({ name, phone });
+    }
+
+    if (success) {
+      closeModal();
       fetchBuyers();
     } else {
-      Alert.alert('Erreur', "Impossible d'ajouter l'acheteur.");
+      Alert.alert('Erreur', `Impossible ${editingId ? 'de modifier' : "d'ajouter"} l'acheteur.`);
     }
   };
 
@@ -55,9 +81,25 @@ export default function BuyersList() {
         <Text style={styles.name}>{item.name}</Text>
         {item.phone && <Text style={styles.phone}>{item.phone}</Text>}
       </View>
-      <TouchableOpacity onPress={() => item.id && BuyerService.deleteBuyer(item.id) && fetchBuyers()}>
-        <MaterialCommunityIcons name="trash-can-outline" size={24} color="#FF3B30" />
-      </TouchableOpacity>
+      <View style={styles.actions}>
+        <TouchableOpacity onPress={() => openModal(item)} style={styles.actionBtn}>
+          <MaterialCommunityIcons name="pencil-outline" size={24} color="#007AFF" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => {
+            Alert.alert(
+              "Supprimer",
+              "Voulez-vous vraiment supprimer cet acheteur ?",
+              [
+                { text: "Annuler", style: "cancel" },
+                { text: "Supprimer", style: "destructive", onPress: () => item.id && BuyerService.deleteBuyer(item.id) && fetchBuyers() }
+              ]
+            );
+          }} 
+          style={styles.actionBtn}
+        >
+          <MaterialCommunityIcons name="trash-can-outline" size={24} color="#FF3B30" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -81,14 +123,14 @@ export default function BuyersList() {
         ListEmptyComponent={<Text style={styles.empty}>Aucun acheteur enregistré.</Text>}
       />
 
-      <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
+      <TouchableOpacity style={styles.fab} onPress={() => openModal()}>
         <MaterialCommunityIcons name="account-plus" size={30} color="#FFF" />
       </TouchableOpacity>
 
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={closeModal}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Nouvel Acheteur</Text>
+            <Text style={styles.modalTitle}>{editingId ? "Modifier l'acheteur" : "Nouvel Acheteur"}</Text>
             <TextInput 
               style={styles.input} 
               placeholder="Nom complet" 
@@ -103,11 +145,11 @@ export default function BuyersList() {
               onChangeText={setPhone}
             />
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.btnCancel} onPress={() => setModalVisible(false)}>
+              <TouchableOpacity style={styles.btnCancel} onPress={closeModal}>
                 <Text style={styles.btnTextCancel}>Annuler</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.btnAdd} onPress={handleAddBuyer}>
-                <Text style={styles.btnTextAdd}>Enregistrer</Text>
+              <TouchableOpacity style={styles.btnAdd} onPress={handleSaveBuyer}>
+                <Text style={styles.btnTextAdd}>{editingId ? "Modifier" : "Enregistrer"}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -128,6 +170,8 @@ const styles = StyleSheet.create({
   info: { flex: 1 },
   name: { fontSize: 16, fontWeight: 'bold' },
   phone: { fontSize: 14, color: '#666' },
+  actions: { flexDirection: 'row' },
+  actionBtn: { padding: 5, marginLeft: 5 },
   fab: { position: 'absolute', right: 20, bottom: 20, backgroundColor: '#007AFF', width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 5 },
   empty: { textAlign: 'center', marginTop: 50, color: '#999' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },

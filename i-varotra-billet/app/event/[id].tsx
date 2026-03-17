@@ -1,7 +1,7 @@
 // app/event/[id].tsx
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
 import { EventService, Event } from '../../services/EventService';
 import { TicketService } from '../../services/TicketService';
 import { PdfService } from '../../services/PdfService';
@@ -76,14 +76,44 @@ export default function EventDetails() {
     setExporting(false);
   };
 
+  const handleDelete = () => {
+    Alert.alert(
+      'Supprimer l\'événement',
+      'Êtes-vous sûr de vouloir supprimer cet événement et tous les billets associés ? Cette action est irréversible.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Supprimer', 
+          style: 'destructive',
+          onPress: () => {
+            if (EventService.deleteEvent(eventId)) {
+              router.back();
+            } else {
+              Alert.alert('Erreur', 'Impossible de supprimer l\'événement.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" /></View>;
   if (!event) return <View style={styles.center}><Text>Événement non trouvé</Text></View>;
 
   return (
     <ScrollView style={styles.container}>
+      <Stack.Screen 
+        options={{
+          headerRight: () => role === 'admin' ? (
+            <TouchableOpacity onPress={() => router.push({ pathname: '/add-event', params: { id: eventId } })}>
+              <MaterialCommunityIcons name="pencil" size={24} color="#007AFF" />
+            </TouchableOpacity>
+          ) : null
+        }}
+      />
       <View style={styles.header}>
         <Text style={styles.title}>{event.name}</Text>
-        <Text style={styles.date}>{event.date}</Text>
+        <Text style={styles.date}>{event.event_date}</Text>
         {event.slogan && <Text style={styles.slogan}>{event.slogan}</Text>}
       </View>
 
@@ -161,6 +191,16 @@ export default function EventDetails() {
           <MaterialCommunityIcons name="chevron-right" size={24} color="#CCC" />
         </View>
       </TouchableOpacity>
+
+      {role === 'admin' && (
+        <TouchableOpacity 
+          style={[styles.card, styles.deleteButton]} 
+          onPress={handleDelete}
+        >
+          <MaterialCommunityIcons name="trash-can-outline" size={20} color="#FF3B30" />
+          <Text style={styles.deleteButtonText}>Supprimer l'événement</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }
@@ -183,5 +223,7 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#F3F4F6', borderRadius: 8, padding: 12, fontSize: 16 },
   button: { backgroundColor: '#007AFF', flexDirection: 'row', borderRadius: 10, padding: 15, alignItems: 'center', justifyContent: 'center', gap: 10 },
   buttonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  viewTickets: { marginTop: 0, flexDirection: 'column' }
+  viewTickets: { marginTop: 0, flexDirection: 'column' },
+  deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderColor: '#FF3B30', borderWidth: 1, backgroundColor: 'transparent' },
+  deleteButtonText: { color: '#FF3B30', fontWeight: 'bold' }
 });
