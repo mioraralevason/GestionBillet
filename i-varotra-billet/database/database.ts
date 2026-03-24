@@ -7,17 +7,19 @@ if (Platform.OS !== 'web') {
   db = SQLite.openDatabaseSync('ticketapp.db');
 } else {
   db = {
-    execSync: (query: string) => console.log('SQLite non supporté sur le web', query),
-    runSync: (query: string, ...args: any[]) => console.log('SQLite non supporté sur le web', query, args),
+    execSync: (query: string) => console.log('SQLite not supported on web', query),
+    runSync: (query: string, ...args: any[]) => console.log('SQLite not supported on web', query, args),
     getFirstSync: (query: string, ...args: any[]) => {
-       console.log('SQLite non supporté sur le web', query, args);
+       console.log('SQLite not supported on web', query, args);
        return null;
     },
     getAllSync: (query: string, ...args: any[]) => {
-      console.log('SQLite non supporté sur le web', query, args);
+      console.log('SQLite not supported on web', query, args);
       return [];
    }
   };
+}
+
 /**
  * Initializes the SQLite database schema and seeds initial data.
  * Performs migrations if old schema structures are detected.
@@ -29,8 +31,8 @@ export const initDB = () => {
   // Migration: If we detect old structure (e.g., ticket_id in buyers), reset tables
   try {
     const tableInfo: any[] = db.getAllSync(`PRAGMA table_info(buyers)`);
-    const hasTicketId = tableInfo.some(column => column.name === 'ticket_id');
-
+    const hasTicketId = tableInfo.some((column: any) => column.name === 'ticket_id');
+    
     if (hasTicketId) {
       console.log("Migrating to unique Buyer ID...");
       db.execSync(`DROP TABLE IF EXISTS attendance;`);
@@ -41,19 +43,23 @@ export const initDB = () => {
       db.execSync(`DROP TABLE IF EXISTS status;`);
       db.execSync(`DROP TABLE IF EXISTS users;`);
     }
+
+    // New Migration: Add 'color' column to 'events' if it doesn't exist
+    const eventTableInfo: any[] = db.getAllSync(`PRAGMA table_info(events)`);
+    const hasColorColumn = eventTableInfo.some((column: any) => column.name === 'color');
+    if (eventTableInfo.length > 0 && !hasColorColumn) {
+      console.log("Adding 'color' column to 'events' table...");
+      db.execSync(`ALTER TABLE events ADD COLUMN color TEXT DEFAULT '#007AFF';`);
+    }
   } catch (e) {
     console.error("Migration error", e);
   }
 
-  // Define tables
-  // ... (Schema creation code)
-
-/**
- * Authenticates a user by their PIN code.
- * @param {string} pin - The 4-digit PIN entered by the user.
- * @param {(role: string | null) => void} callback - Callback function with the assigned role.
- */
-export const getUserByPin = (pin: string, callback: (role: string | null) => void) => {
+  db.execSync(
+    `CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pin TEXT NOT NULL,
+      role TEXT NOT NULL,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );`
   );
@@ -149,6 +155,11 @@ export const getUserByPin = (pin: string, callback: (role: string | null) => voi
   }
 };
 
+/**
+ * Authenticates a user by their PIN code.
+ * @param {string} pin - The 4-digit PIN entered by the user.
+ * @param {(role: string | null) => void} callback - Callback function with the assigned role.
+ */
 export const getUserByPin = (pin: string, callback: (role: string | null) => void) => {
   if (Platform.OS === 'web') { callback(null); return; }
   try {
