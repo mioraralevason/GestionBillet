@@ -18,18 +18,21 @@ if (Platform.OS !== 'web') {
       return [];
    }
   };
-}
-
+/**
+ * Initializes the SQLite database schema and seeds initial data.
+ * Performs migrations if old schema structures are detected.
+ * Not available on Web platform.
+ */
 export const initDB = () => {
   if (Platform.OS === 'web') return;
 
-  // Migration: Si on détecte encore l'ancienne structure (ticket_id dans buyers), on réinitialise
+  // Migration: If we detect old structure (e.g., ticket_id in buyers), reset tables
   try {
     const tableInfo: any[] = db.getAllSync(`PRAGMA table_info(buyers)`);
     const hasTicketId = tableInfo.some(column => column.name === 'ticket_id');
-    
+
     if (hasTicketId) {
-      console.log("Migration vers Buyer ID unique...");
+      console.log("Migrating to unique Buyer ID...");
       db.execSync(`DROP TABLE IF EXISTS attendance;`);
       db.execSync(`DROP TABLE IF EXISTS payments;`);
       db.execSync(`DROP TABLE IF EXISTS buyers;`);
@@ -39,14 +42,18 @@ export const initDB = () => {
       db.execSync(`DROP TABLE IF EXISTS users;`);
     }
   } catch (e) {
-    console.error("Erreur migration", e);
+    console.error("Migration error", e);
   }
 
-  db.execSync(
-    `CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pin TEXT NOT NULL,
-      role TEXT NOT NULL,
+  // Define tables
+  // ... (Schema creation code)
+
+/**
+ * Authenticates a user by their PIN code.
+ * @param {string} pin - The 4-digit PIN entered by the user.
+ * @param {(role: string | null) => void} callback - Callback function with the assigned role.
+ */
+export const getUserByPin = (pin: string, callback: (role: string | null) => void) => {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );`
   );

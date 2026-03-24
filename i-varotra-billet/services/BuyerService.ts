@@ -1,5 +1,8 @@
 import db from '../database/database';
 
+/**
+ * Represents a buyer in the system.
+ */
 export interface Buyer {
   id?: number;
   name: string;
@@ -8,19 +11,30 @@ export interface Buyer {
   updated_at?: string;
 }
 
+/**
+ * Service handling buyer-related database operations.
+ */
 export const BuyerService = {
+  /**
+   * Retrieves all buyers from the database, ordered by name.
+   * @returns {Buyer[]} List of buyers.
+   */
   getBuyers: (): Buyer[] => {
     try {
       return db.getAllSync(`SELECT * FROM buyers ORDER BY name ASC`);
     } catch (error) {
-      console.error('Erreur lors de la récupération des acheteurs', error);
+      console.error('Error fetching buyers', error);
       return [];
     }
   },
 
+  /**
+   * Adds a new buyer or returns the ID of an existing one (matching name and phone).
+   * @param {Buyer} buyer - Buyer data to insert.
+   * @returns {number | null} The ID of the buyer.
+   */
   addBuyer: (buyer: Buyer): number | null => {
     try {
-      // On cherche d'abord si l'acheteur existe déjà par nom et téléphone
       const existing: any = db.getFirstSync(
         `SELECT id FROM buyers WHERE name = ? AND phone = ?`,
         buyer.name,
@@ -36,11 +50,16 @@ export const BuyerService = {
       );
       return result.lastInsertRowId;
     } catch (error) {
-      console.error('Erreur lors de l\'ajout de l\'acheteur', error);
+      console.error('Error adding buyer', error);
       return null;
     }
   },
 
+  /**
+   * Updates an existing buyer's information.
+   * @param {Buyer} buyer - Buyer data to update.
+   * @returns {boolean} Success status.
+   */
   updateBuyer: (buyer: Buyer): boolean => {
     if (!buyer.id) return false;
     try {
@@ -54,6 +73,11 @@ export const BuyerService = {
     } catch (error) { return false; }
   },
 
+  /**
+   * Deletes a buyer from the database.
+   * @param {number} id - Buyer ID.
+   * @returns {boolean} Success status.
+   */
   deleteBuyer: (id: number): boolean => {
     try {
       db.runSync(`DELETE FROM buyers WHERE id = ?`, id);

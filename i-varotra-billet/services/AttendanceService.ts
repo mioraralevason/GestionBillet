@@ -1,6 +1,9 @@
 import db from '../database/database';
 import { TicketService } from './TicketService';
 
+/**
+ * Result object for a ticket validation attempt.
+ */
 export interface ValidationResult {
   success: boolean;
   message: string;
@@ -8,7 +11,16 @@ export interface ValidationResult {
   warning?: boolean;
 }
 
+/**
+ * Service handling ticket validation and entry control (check-ins).
+ */
 export const AttendanceService = {
+  /**
+   * Validates a ticket using its QR code string.
+   * Checks for existence, previous usage, and payment status.
+   * @param {string} qrCode - The raw QR code data.
+   * @returns {ValidationResult} Result of the validation process.
+   */
   validateTicket: (qrCode: string): ValidationResult => {
     try {
       const ticket: any = db.getFirstSync(
@@ -23,25 +35,25 @@ export const AttendanceService = {
       );
 
       if (!ticket) {
-        return { success: false, message: 'Billet inexistant' };
+        return { success: false, message: 'Ticket not found' };
       }
 
-      // 1. Vérifier si le billet est déjà validé
+      // 1. Check if already validated
       if (ticket.status_id === TicketService.STATUS_VALIDE) {
-        return { success: false, message: 'Billet déjà utilisé / vérifié', ticket, warning: true };
+        return { success: false, message: 'Ticket already used / verified', ticket, warning: true };
       }
 
-      // 2. Vérifier si le billet est payé
+      // 2. Check if fully paid
       const totalPaid = ticket.total_paid || 0;
       if (totalPaid < ticket.price) {
         return { 
           success: false, 
-          message: `Billet non payé entièrement (${totalPaid} / ${ticket.price} Ar). Entrée refusée.`, 
+          message: `Ticket not fully paid (${totalPaid} / ${ticket.price} Ar). Entry refused.`, 
           ticket 
         };
       }
 
-      // 3. Valider le billet
+      // 3. Mark as validated
       db.runSync(
         `UPDATE tickets SET status_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         TicketService.STATUS_VALIDE,
@@ -57,15 +69,20 @@ export const AttendanceService = {
 
       return { 
         success: true, 
-        message: 'Billet valide ! Entrée autorisée.', 
-        ticket: { ...ticket, status_id: TicketService.STATUS_VALIDE, status_name: 'Validé' } 
+        message: 'Valid Ticket! Entry authorized.', 
+        ticket: { ...ticket, status_id: TicketService.STATUS_VALIDE, status_name: 'Validated' } 
       };
     } catch (error) {
-      console.error('Erreur validation', error);
-      return { success: false, message: 'Erreur lors de la validation' };
+      console.error('Validation error', error);
+      return { success: false, message: 'Error during validation' };
     }
   },
 
+  /**
+   * Validates a ticket by its ID (manual verification).
+   * @param {number} ticketId - ID of the ticket.
+   * @returns {ValidationResult} Result of the verification.
+   */
   verifyTicketById: (ticketId: number): ValidationResult => {
     try {
       const ticket: any = db.getFirstSync(
@@ -80,18 +97,18 @@ export const AttendanceService = {
       );
 
       if (!ticket) {
-        return { success: false, message: 'Billet inexistant' };
+        return { success: false, message: 'Ticket not found' };
       }
 
       if (ticket.status_id === TicketService.STATUS_VALIDE) {
-        return { success: false, message: 'Billet déjà utilisé / vérifié', ticket, warning: true };
+        return { success: false, message: 'Ticket already used / verified', ticket, warning: true };
       }
 
       const totalPaid = ticket.total_paid || 0;
       if (totalPaid < ticket.price) {
         return { 
           success: false, 
-          message: `Billet non payé entièrement (${totalPaid} / ${ticket.price} Ar). Entrée refusée.`, 
+          message: `Ticket not fully paid (${totalPaid} / ${ticket.price} Ar). Entry refused.`, 
           ticket 
         };
       }
@@ -111,28 +128,33 @@ export const AttendanceService = {
 
       return { 
         success: true, 
-        message: 'Billet vérifié avec succès !', 
-        ticket: { ...ticket, status_id: TicketService.STATUS_VALIDE, status_name: 'Validé' } 
+        message: 'Ticket verified successfully!', 
+        ticket: { ...ticket, status_id: TicketService.STATUS_VALIDE, status_name: 'Validated' } 
       };
     } catch (error) {
-      console.error('Erreur verification manuelle', error);
-      return { success: false, message: 'Erreur lors de la vérification' };
+      console.error('Manual verification error', error);
+      return { success: false, message: 'Error during verification' };
     }
   },
 
+  /**
+   * Retrieves attendance records for a specific event.
+   * @param {number} eventId - Event ID.
+   * @returns {any[]} List of attendance records.
+   */
   getAttendanceByEvent: (eventId: number) => {
     try {
       return db.getAllSync(
         `SELECT a.*, t.ticket_number, b.name as buyer_name
          FROM attendance a
          JOIN tickets t ON a.ticket_id = t.id
-         LEFT JOIN buyers b ON b.ticket_id = t.id
+         LEFT JOIN buyers b ON b.id = t.buyer_id
          WHERE t.event_id = ?
          ORDER BY a.checkin_time DESC`,
         eventId
       );
     } catch (error) {
-      console.error('Erreur lors de la récupération des présences', error);
+      console.error('Error fetching attendance', error);
       return [];
     }
   }

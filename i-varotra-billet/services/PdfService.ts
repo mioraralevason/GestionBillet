@@ -3,7 +3,17 @@ import * as Sharing from 'expo-sharing';
 import { Ticket } from './TicketService';
 import { Event } from './EventService';
 
+/**
+ * Service handling PDF generation and sharing for tickets.
+ */
 export const PdfService = {
+  /**
+   * Generates a PDF file containing printable tickets with Recto/Verso layout.
+   * The layout is designed for A4 paper with a 3x3 grid (9 tickets per page).
+   * @param {Event} event - The event data to display on tickets.
+   * @param {Ticket[]} tickets - The list of tickets to generate.
+   * @returns {Promise<boolean>} True if the PDF was generated and shared successfully.
+   */
   exportTicketsToPdf: async (event: Event, tickets: Ticket[]) => {
     // Generate HTML for 3x3 layout (Recto on page 1, Verso on page 2)
     // For 9 tickets, we need at least 2 pages (or more if more than 9 tickets)

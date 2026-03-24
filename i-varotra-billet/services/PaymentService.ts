@@ -1,5 +1,8 @@
 import db from '../database/database';
 
+/**
+ * Represents a payment record in the system.
+ */
 export interface Payment {
   id?: number;
   ticket_id: number;
@@ -8,7 +11,16 @@ export interface Payment {
   created_at?: string;
 }
 
+/**
+ * Service handling ticket payment operations.
+ */
 export const PaymentService = {
+  /**
+   * Adds a new payment record for a ticket.
+   * @param {number} ticketId - Ticket ID.
+   * @param {number} amount - Amount paid.
+   * @returns {number | null} ID of the payment record.
+   */
   addPayment: (ticketId: number, amount: number): number | null => {
     try {
       const result = db.runSync(
@@ -18,11 +30,16 @@ export const PaymentService = {
       );
       return result.lastInsertRowId;
     } catch (error) {
-      console.error('Erreur lors de l\'ajout du paiement', error);
+      console.error('Error adding payment', error);
       return null;
     }
   },
 
+  /**
+   * Retrieves all payments for a specific ticket.
+   * @param {number} ticketId - Ticket ID.
+   * @returns {Payment[]} List of payments.
+   */
   getPaymentsByTicket: (ticketId: number): Payment[] => {
     try {
       return db.getAllSync(
@@ -30,11 +47,16 @@ export const PaymentService = {
         ticketId
       );
     } catch (error) {
-      console.error('Erreur lors de la récupération des paiements', error);
+      console.error('Error fetching payments', error);
       return [];
     }
   },
 
+  /**
+   * Calculates the total amount paid for a specific ticket.
+   * @param {number} ticketId - Ticket ID.
+   * @returns {number} Sum of all payments.
+   */
   getTotalPaidForTicket: (ticketId: number): number => {
     try {
       const result: any = db.getFirstSync(
@@ -43,7 +65,7 @@ export const PaymentService = {
       );
       return result ? result.total || 0 : 0;
     } catch (error) {
-      console.error('Erreur lors du calcul du total payé', error);
+      console.error('Error calculating total paid', error);
       return 0;
     }
   }

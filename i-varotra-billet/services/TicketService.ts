@@ -1,6 +1,9 @@
 import db from '../database/database';
 import { BuyerService } from './BuyerService';
 
+/**
+ * Represents a ticket in the system.
+ */
 export interface Ticket {
   id?: number;
   event_id: number;
@@ -17,11 +20,21 @@ export interface Ticket {
   updated_at?: string;
 }
 
+/**
+ * Service handling ticket-related operations including generation and assignment.
+ */
 export const TicketService = {
   STATUS_DISPONIBLE: 1,
   STATUS_VENDU: 2,
   STATUS_VALIDE: 3,
 
+  /**
+   * Generates a specified number of tickets for an event.
+   * @param {number} eventId - The ID of the event.
+   * @param {number} count - How many tickets to create.
+   * @param {number} price - Base price for each ticket.
+   * @returns {boolean} True if generation was successful.
+   */
   generateTickets: (eventId: number, count: number, price: number): boolean => {
     try {
       const stats: any = db.getFirstSync(`SELECT COUNT(*) as total FROM tickets WHERE event_id = ?`, eventId);
@@ -35,6 +48,12 @@ export const TicketService = {
     } catch (error) { return false; }
   },
 
+  /**
+   * Retrieves all tickets associated with a specific event.
+   * Includes details about the buyer and payment status.
+   * @param {number} eventId - The ID of the event.
+   * @returns {Ticket[]} List of tickets.
+   */
   getTicketsByEvent: (eventId: number): Ticket[] => {
     try {
       return db.getAllSync(
@@ -49,6 +68,11 @@ export const TicketService = {
     } catch (error) { return []; }
   },
 
+  /**
+   * Retrieves a single ticket by its ID.
+   * @param {number} id - Unique identifier of the ticket.
+   * @returns {Ticket | null} The ticket object or null.
+   */
   getTicketById: (id: number): Ticket | null => {
     try {
       return db.getFirstSync(
@@ -63,13 +87,19 @@ export const TicketService = {
     } catch (error) { return null; }
   },
 
+  /**
+   * Assigns a ticket to a buyer and records a payment.
+   * @param {number} ticketId - ID of the ticket to assign.
+   * @param {string} buyerName - Name of the buyer.
+   * @param {string} buyerPhone - Phone number of the buyer.
+   * @param {number} amount - Initial payment amount.
+   * @returns {boolean} Success status.
+   */
   assignTicket: (ticketId: number, buyerName: string, buyerPhone: string, amount: number): boolean => {
     try {
-      // 1. Gérer l'acheteur unique
       const buyerId = BuyerService.addBuyer({ name: buyerName, phone: buyerPhone });
       if (!buyerId) return false;
 
-      // 2. Lier le ticket à cet acheteur
       db.runSync(
         `UPDATE tickets SET buyer_id = ?, status_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         buyerId,
@@ -77,7 +107,6 @@ export const TicketService = {
         ticketId
       );
 
-      // 3. Ajouter le paiement
       if (amount > 0) {
         db.runSync(`INSERT INTO payments (ticket_id, amount) VALUES (?, ?)`, ticketId, amount);
       }
@@ -85,6 +114,11 @@ export const TicketService = {
     } catch (error) { return false; }
   },
 
+  /**
+   * Updates multiple tickets at once for the same buyer.
+   * @param {object} data - Batch data containing buyer info and ticket list.
+   * @returns {boolean} Success status.
+   */
   updateTicketsBatch: (data: { 
     buyer_name: string, 
     buyer_phone: string, 
@@ -101,6 +135,12 @@ export const TicketService = {
     } catch (error) { return false; }
   },
 
+  /**
+   * Updates the status of a specific ticket.
+   * @param {number} id - Ticket ID.
+   * @param {number} statusId - New status ID.
+   * @returns {boolean} Success status.
+   */
   updateStatus: (id: number, statusId: number): boolean => {
     try {
       db.runSync(`UPDATE tickets SET status_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, statusId, id);
@@ -108,6 +148,11 @@ export const TicketService = {
     } catch (error) { return false; }
   },
 
+  /**
+   * Deletes all payment records for a ticket.
+   * @param {number} ticketId - Ticket ID.
+   * @returns {boolean} Success status.
+   */
   cancelPayments: (ticketId: number): boolean => {
     try {
       db.runSync(`DELETE FROM payments WHERE ticket_id = ?`, ticketId);
@@ -115,6 +160,11 @@ export const TicketService = {
     } catch (error) { return false; }
   },
 
+  /**
+   * Resets a ticket's verification status back to "Sold" and removes attendance record.
+   * @param {number} ticketId - Ticket ID.
+   * @returns {boolean} Success status.
+   */
   resetTicketVerification: (ticketId: number): boolean => {
     try {
       db.runSync(
@@ -127,6 +177,11 @@ export const TicketService = {
     } catch (error) { return false; }
   },
 
+  /**
+   * Resets verification for multiple tickets.
+   * @param {number[]} ticketIds - Array of ticket IDs.
+   * @returns {boolean} Success status.
+   */
   resetTicketsVerificationBatch: (ticketIds: number[]): boolean => {
     try {
       const placeholders = ticketIds.map(() => '?').join(',');
@@ -140,6 +195,11 @@ export const TicketService = {
     } catch (error) { return false; }
   },
 
+  /**
+   * Calculates comprehensive statistics for an event including financials.
+   * @param {number} eventId - ID of the event.
+   * @returns {object} Object containing counts and revenue data.
+   */
   getEventStats: (eventId: number) => {
     try {
       const counts: any = db.getFirstSync(
