@@ -8,6 +8,8 @@ export const PdfService = {
     // Generate HTML for 3x3 layout (Recto on page 1, Verso on page 2)
     // For 9 tickets, we need at least 2 pages (or more if more than 9 tickets)
     
+    const themeColor = event.color || '#007AFF';
+    
     let htmlContent = `
       <html>
       <head>
@@ -34,16 +36,24 @@ export const PdfService = {
             align-items: center;
             text-align: center;
             overflow: hidden;
+            position: relative;
           }
-          .ticket-recto { background-color: #FFF; }
-          .ticket-verso { background-color: #F9F9F9; }
-          .event-name { font-size: 14pt; font-bold: bold; color: #007AFF; margin-bottom: 2mm; text-transform: uppercase; }
+          .ticket-recto { background-color: #FFF; border-left: 2mm solid ${themeColor}; }
+          .ticket-verso { background-color: #F9F9F9; border-right: 2mm solid ${themeColor}; }
+          .event-name { font-size: 14pt; font-weight: bold; color: ${themeColor}; margin-bottom: 2mm; text-transform: uppercase; }
           .event-date { font-size: 10pt; color: #666; margin-bottom: 3mm; }
-          .ticket-num { font-size: 12pt; font-weight: bold; background: #EEE; padding: 1mm 3mm; border-radius: 4mm; }
+          .ticket-num { font-size: 12pt; font-weight: bold; background: #EEE; padding: 1mm 3mm; border-radius: 4mm; color: #333; }
           .qr-code { width: 35mm; height: 35mm; margin: 3mm 0; }
-          .slogan { font-size: 9pt; font-style: italic; color: #007AFF; margin-top: 2mm; }
-          .description { font-size: 8pt; color: #444; text-align: left; line-height: 1.2; }
-          .info-footer { font-size: 7pt; color: #999; border-top: 0.1mm solid #EEE; padding-top: 1mm; width: 100%; }
+          .slogan { font-size: 9pt; font-style: italic; color: ${themeColor}; margin-top: 2mm; }
+          .description { font-size: 8pt; color: #444; text-align: left; line-height: 1.2; padding: 2mm; background: rgba(255,255,255,0.7); border-radius: 2mm; z-index: 2; }
+          .info-footer { font-size: 7pt; color: #999; border-top: 0.1mm solid #EEE; padding-top: 1mm; width: 100%; z-index: 2; }
+          .verso-image {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover;
+            opacity: 0.2;
+            z-index: 1;
+          }
         </style>
       </head>
       <body>
@@ -78,15 +88,14 @@ export const PdfService = {
       // To mirror: Row 1 [1,2,3] becomes [3,2,1] on the back
       for (let row = 0; row < 3; row++) {
         const rowTickets = chunk.slice(row * 3, row * 3 + 3);
-        // Fill row to 3 elements if needed
         const fullRow = [...rowTickets];
         while (fullRow.length < 3) fullRow.push(null as any);
         
-        // Reverse row for back side mirroring
         fullRow.reverse().forEach(t => {
           if (t) {
             htmlContent += `
               <div class="ticket ticket-verso">
+                ${event.image ? `<img src="${event.image}" class="verso-image" />` : ''}
                 <div class="description">${event.description || 'Merci de votre participation !'}</div>
                 <div class="info-footer">Billet : ${t.ticket_number} | Prix : ${t.price} Ar</div>
               </div>

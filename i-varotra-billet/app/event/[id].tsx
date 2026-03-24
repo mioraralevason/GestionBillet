@@ -14,13 +14,14 @@ export default function EventDetails() {
   const eventId = parseInt(id as string);
 
   const [event, setEvent] = useState<Event | null>(null);
-  const [stats, setStats] = useState({ total: 0, available: 0, sold: 0, validated: 0 });
+  const [stats, setStats] = useState<any>({ total: 0, available: 0, sold: 0, validated: 0, total_collected: 0, total_pending: 0, total_potential_revenue: 0 });
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<string | null>(null);
-  
   const [ticketCount, setTicketCount] = useState('');
   const [ticketPrice, setTicketPrice] = useState('');
   const [exporting, setExporting] = useState(false);
+
+  const themeColor = event?.color || '#007AFF';
 
   const fetchData = useCallback(async () => {
     const userRole = await AsyncStorage.getItem('userRole');
@@ -97,7 +98,7 @@ export default function EventDetails() {
     );
   };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" /></View>;
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
   if (!event) return <View style={styles.center}><Text>Événement non trouvé</Text></View>;
 
   return (
@@ -106,15 +107,15 @@ export default function EventDetails() {
         options={{
           headerRight: () => role === 'admin' ? (
             <TouchableOpacity onPress={() => router.push({ pathname: '/add-event', params: { id: eventId } })}>
-              <MaterialCommunityIcons name="pencil" size={24} color="#007AFF" />
+              <MaterialCommunityIcons name="pencil" size={24} color={themeColor} />
             </TouchableOpacity>
           ) : null
         }}
       />
-      <View style={styles.header}>
+      <View style={[styles.header, { borderLeftWidth: 8, borderLeftColor: themeColor }]}>
         <Text style={styles.title}>{event.name}</Text>
         <Text style={styles.date}>{event.event_date}</Text>
-        {event.slogan && <Text style={styles.slogan}>{event.slogan}</Text>}
+        {event.slogan && <Text style={[styles.slogan, { color: themeColor }]}>{event.slogan}</Text>}
       </View>
 
       <View style={styles.statsContainer}>
@@ -131,6 +132,26 @@ export default function EventDetails() {
           <Text style={styles.statLabel}>Validés</Text>
         </View>
       </View>
+
+      {role === 'admin' && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Bilan Financier</Text>
+          <View style={styles.financeRow}>
+            <View style={styles.financeItem}>
+              <Text style={styles.financeLabel}>Encaissé</Text>
+              <Text style={[styles.financeValue, { color: '#34C759' }]}>{stats.total_collected.toLocaleString()} Ar</Text>
+            </View>
+            <View style={styles.financeItem}>
+              <Text style={styles.financeLabel}>Reste</Text>
+              <Text style={[styles.financeValue, { color: '#FF3B30' }]}>{stats.total_pending.toLocaleString()} Ar</Text>
+            </View>
+          </View>
+          <View style={[styles.financeItem, { marginTop: 15, borderTopWidth: 1, borderTopColor: '#EEE', paddingTop: 10 }]}>
+            <Text style={styles.financeLabel}>Chiffre d'affaires total prévu</Text>
+            <Text style={[styles.financeValue, { fontSize: 20, color: themeColor }]}>{stats.total_potential_revenue.toLocaleString()} Ar</Text>
+          </View>
+        </View>
+      )}
 
       {role === 'admin' && (
         <View style={styles.card}>
@@ -157,7 +178,7 @@ export default function EventDetails() {
               />
             </View>
           </View>
-          <TouchableOpacity style={styles.button} onPress={handleGenerate}>
+          <TouchableOpacity style={[styles.button, { backgroundColor: themeColor }]} onPress={handleGenerate}>
             <MaterialCommunityIcons name="ticket-plus" size={20} color="#FFF" />
             <Text style={styles.buttonText}>Créer les billets</Text>
           </TouchableOpacity>
@@ -185,7 +206,7 @@ export default function EventDetails() {
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <MaterialCommunityIcons name="ticket-confirmation" size={24} color="#007AFF" />
+            <MaterialCommunityIcons name="ticket-confirmation" size={24} color={themeColor} />
             <Text style={[styles.cardTitle, { marginBottom: 0, marginLeft: 10 }]}>Voir la liste des billets</Text>
           </View>
           <MaterialCommunityIcons name="chevron-right" size={24} color="#CCC" />
@@ -218,6 +239,10 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12, color: '#999', marginTop: 4 },
   card: { backgroundColor: '#FFF', margin: 20, padding: 20, borderRadius: 12, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 3 },
   cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15 },
+  financeRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  financeItem: { flex: 1 },
+  financeLabel: { fontSize: 12, color: '#999', textTransform: 'uppercase', marginBottom: 5 },
+  financeValue: { fontSize: 18, fontWeight: 'bold' },
   row: { flexDirection: 'row', marginBottom: 15 },
   label: { fontSize: 13, color: '#666', marginBottom: 5 },
   input: { backgroundColor: '#F3F4F6', borderRadius: 8, padding: 12, fontSize: 16 },

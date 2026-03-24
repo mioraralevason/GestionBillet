@@ -4,6 +4,8 @@ import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { EventService } from '../services/EventService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 
 export default function AddEvent() {
   const router = useRouter();
@@ -16,6 +18,10 @@ export default function AddEvent() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [slogan, setSlogan] = useState('');
   const [description, setDescription] = useState('');
+  const [color, setColor] = useState('#007AFF');
+  const [image, setImage] = useState<string | null>(null);
+
+  const colorPresets = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE', '#5856D6', '#000000'];
 
   useEffect(() => {
     if (isEditing) {
@@ -27,9 +33,31 @@ export default function AddEvent() {
         }
         setSlogan(event.slogan || '');
         setDescription(event.description || '');
+        setColor(event.color || '#007AFF');
+        setImage(event.image || null);
       }
     }
   }, [eventId, isEditing]);
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.7,
+      base64: true, // On utilise le base64 pour faciliter l'export PDF plus tard
+    });
+
+    if (!result.canceled) {
+      // On stocke le base64 si disponible, sinon l'URI
+      const imageAsset = result.assets[0];
+      if (imageAsset.base64) {
+        setImage(`data:image/jpeg;base64,${imageAsset.base64}`);
+      } else {
+        setImage(imageAsset.uri);
+      }
+    }
+  };
 
   const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowDatePicker(false);
@@ -55,9 +83,11 @@ export default function AddEvent() {
     const eventData = {
       id: eventId || undefined,
       name: name.trim(),
-      event_date: date.toISOString().split('T')[0], // On stocke la date au format ISO YYYY-MM-DD
+      event_date: date.toISOString().split('T')[0],
       slogan: slogan.trim(),
       description: description.trim(),
+      color: color,
+      image: image || '',
     };
 
     if (isEditing) {
@@ -130,6 +160,25 @@ export default function AddEvent() {
         </View>
 
         <View style={styles.formGroup}>
+          <Text style={styles.label}>Image ou Visuel (Optionnel)</Text>
+          <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+            {image ? (
+              <Image source={{ uri: image }} style={styles.previewImage} />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <MaterialCommunityIcons name="image-plus" size={40} color="#999" />
+                <Text style={styles.imagePlaceholderText}>Choisir une image</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          {image && (
+            <TouchableOpacity onPress={() => setImage(null)} style={styles.removeImageBtn}>
+              <Text style={styles.removeImageText}>Supprimer l'image</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.formGroup}>
           <Text style={styles.label}>Description</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
@@ -141,7 +190,24 @@ export default function AddEvent() {
           />
         </View>
 
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Couleur thématique</Text>
+          <View style={styles.colorGrid}>
+            {colorPresets.map(c => (
+              <TouchableOpacity 
+                key={c} 
+                style={[
+                  styles.colorCircle, 
+                  { backgroundColor: c },
+                  color === c && styles.colorCircleSelected
+                ]} 
+                onPress={() => setColor(c)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <TouchableOpacity style={[styles.saveButton, { backgroundColor: color }]} onPress={handleSave}>
           <MaterialCommunityIcons name="check-circle" size={24} color="#FFF" />
           <Text style={styles.saveButtonText}>
             {isEditing ? 'Enregistrer les modifications' : 'Enregistrer l\'événement'}
@@ -195,6 +261,55 @@ const styles = StyleSheet.create({
   textArea: {
     height: 100,
     textAlignVertical: 'top',
+  },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 15,
+    marginTop: 5,
+  },
+  colorCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: 'transparent',
+  },
+  colorCircleSelected: {
+    borderColor: '#CCC',
+    transform: [{ scale: 1.1 }],
+  },
+  imagePicker: {
+    height: 180,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePlaceholderText: {
+    color: '#999',
+    marginTop: 10,
+    fontSize: 14,
+  },
+  removeImageBtn: {
+    marginTop: 8,
+    alignSelf: 'flex-end',
+  },
+  removeImageText: {
+    color: '#FF3B30',
+    fontSize: 14,
+    fontWeight: '600',
   },
   saveButton: {
     backgroundColor: '#007AFF',

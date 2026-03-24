@@ -58,6 +58,7 @@ export const initDB = () => {
       description TEXT,
       slogan TEXT,
       image TEXT,
+      color TEXT DEFAULT '#007AFF',
       event_date TEXT NOT NULL,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP

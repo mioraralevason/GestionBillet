@@ -142,15 +142,31 @@ export const TicketService = {
 
   getEventStats: (eventId: number) => {
     try {
-      const row: any = db.getFirstSync(
+      const counts: any = db.getFirstSync(
         `SELECT COUNT(*) as total,
           SUM(CASE WHEN status_id = ${TicketService.STATUS_DISPONIBLE} THEN 1 ELSE 0 END) as available,
           SUM(CASE WHEN status_id = ${TicketService.STATUS_VENDU} THEN 1 ELSE 0 END) as sold,
-          SUM(CASE WHEN status_id = ${TicketService.STATUS_VALIDE} THEN 1 ELSE 0 END) as validated
+          SUM(CASE WHEN status_id = ${TicketService.STATUS_VALIDE} THEN 1 ELSE 0 END) as validated,
+          SUM(price) as total_potential_revenue
          FROM tickets WHERE event_id = ?`,
         eventId
       );
-      return row || { total: 0, available: 0, sold: 0, validated: 0 };
-    } catch (error) { return { total: 0, available: 0, sold: 0, validated: 0 }; }
+
+      const payments: any = db.getFirstSync(
+        `SELECT SUM(p.amount) as total_collected
+         FROM payments p
+         JOIN tickets t ON p.ticket_id = t.id
+         WHERE t.event_id = ?`,
+        eventId
+      );
+
+      return {
+        ...(counts || { total: 0, available: 0, sold: 0, validated: 0, total_potential_revenue: 0 }),
+        total_collected: payments?.total_collected || 0,
+        total_pending: (counts?.total_potential_revenue || 0) - (payments?.total_collected || 0)
+      };
+    } catch (error) { 
+      return { total: 0, available: 0, sold: 0, validated: 0, total_potential_revenue: 0, total_collected: 0, total_pending: 0 }; 
+    }
   }
 };

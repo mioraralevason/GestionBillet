@@ -7,6 +7,7 @@ export interface Event {
   description?: string;
   slogan?: string;
   image?: string;
+  color?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -24,13 +25,14 @@ export const EventService = {
   addEvent: (event: Event): number | null => {
     try {
       const result = db.runSync(
-        `INSERT INTO events (name, event_date, description, slogan, image) 
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO events (name, event_date, description, slogan, image, color) 
+         VALUES (?, ?, ?, ?, ?, ?)`,
         event.name || '',
         event.event_date,
         event.description || '',
         event.slogan || '',
-        event.image || ''
+        event.image || '',
+        event.color || '#007AFF'
       );
       return result.lastInsertRowId;
     } catch (error) {
@@ -43,13 +45,14 @@ export const EventService = {
     if (!event.id) return false;
     try {
       db.runSync(
-        `UPDATE events SET name = ?, event_date = ?, description = ?, slogan = ?, image = ?, updated_at = CURRENT_TIMESTAMP 
+        `UPDATE events SET name = ?, event_date = ?, description = ?, slogan = ?, image = ?, color = ?, updated_at = CURRENT_TIMESTAMP 
          WHERE id = ?`,
         event.name || '',
         event.event_date,
         event.description || '',
         event.slogan || '',
         event.image || '',
+        event.color || '#007AFF',
         event.id
       );
       return true;
