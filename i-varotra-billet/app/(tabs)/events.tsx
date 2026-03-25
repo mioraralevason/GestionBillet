@@ -42,29 +42,39 @@ export default function EventsList() {
 
   const renderItem = ({ item }: { item: Event & { stats?: any } }) => (
     <TouchableOpacity 
-      style={styles.eventCard}
+      style={[styles.eventCard, { borderLeftColor: item.color || '#007AFF', borderLeftWidth: 5 }]}
       onPress={() => item.id && router.push(`/event/${item.id}`)}
       activeOpacity={0.7}
     >
       <View style={styles.eventInfo}>
         <View style={styles.cardHeader}>
-          <Text style={styles.eventName}>{item.name || 'Sans nom'}</Text>
-          <View style={styles.ticketBadge}>
-            <MaterialCommunityIcons name="ticket" size={14} color="#FFF" />
+          <Text style={styles.eventName} numberOfLines={1}>{item.name || 'Sans nom'}</Text>
+          <View style={[styles.ticketBadge, { backgroundColor: item.color || '#007AFF' }]}>
+            <MaterialCommunityIcons name="ticket" size={12} color="#FFF" />
             <Text style={styles.ticketCount}>{item.stats?.total || 0}</Text>
           </View>
         </View>
         <Text style={styles.eventDate}>
-          <MaterialCommunityIcons name="calendar-clock" size={14} /> {item.date}
+          <MaterialCommunityIcons name="calendar-clock" size={14} color="#8E8E93" /> {item.event_date}
         </Text>
         {item.slogan && <Text style={styles.eventSlogan} numberOfLines={1}>"{item.slogan}"</Text>}
       </View>
-      <TouchableOpacity 
-        onPress={() => item.id && handleDelete(item.id)}
-        style={styles.deleteButton}
-      >
-        <MaterialCommunityIcons name="trash-can-outline" size={24} color="#FF3B30" />
-      </TouchableOpacity>
+      
+      <View style={styles.actionColumn}>
+        <TouchableOpacity 
+          onPress={() => router.push({ pathname: '/add-event', params: { id: item.id } })}
+          style={styles.actionIconButton}
+        >
+          <MaterialCommunityIcons name="pencil-circle" size={42} color="#007AFF" />
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          onPress={() => item.id && handleDelete(item.id)}
+          style={styles.actionIconButton}
+        >
+          <MaterialCommunityIcons name="delete-circle" size={42} color="#FF3B30" />
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 
@@ -154,11 +164,17 @@ const styles = StyleSheet.create({
   eventSlogan: {
     fontSize: 13,
     fontStyle: 'italic',
-    color: '#007AFF',
+    color: '#8E8E93',
   },
-  deleteButton: {
-    padding: 5,
+  actionColumn: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
     marginLeft: 10,
+  },
+  actionIconButton: {
+    padding: 2,
   },
   emptyContainer: {
     flex: 1,

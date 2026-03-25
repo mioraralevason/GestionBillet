@@ -133,18 +133,18 @@ export default function EventDetails() {
    */
   const handleDelete = () => {
     Alert.alert(
-      'Delete Event',
-      'Are you sure you want to delete this event and all associated tickets? This action cannot be undone.',
+      'Supprimer l\'événement',
+      'Êtes-vous sûr de vouloir supprimer cet événement et tous les billets associés ? Cette action est irréversible.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Annuler', style: 'cancel' },
         { 
-          text: 'Delete', 
+          text: 'Supprimer', 
           style: 'destructive',
           onPress: () => {
             if (EventService.deleteEvent(eventId)) {
               router.back();
             } else {
-              Alert.alert('Error', 'Could not delete event.');
+              Alert.alert('Erreur', 'Impossible de supprimer l\'événement.');
             }
           }
         }
