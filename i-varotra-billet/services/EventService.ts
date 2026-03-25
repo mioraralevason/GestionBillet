@@ -11,6 +11,10 @@ export interface Event {
   slogan?: string;
   image?: string;
   color?: string;
+  img_scale?: number;
+  img_rotate?: number;
+  img_x?: number;
+  img_y?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -40,14 +44,18 @@ export const EventService = {
   addEvent: (event: Event): number | null => {
     try {
       const result = db.runSync(
-        `INSERT INTO events (name, event_date, description, slogan, image, color) 
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO events (name, event_date, description, slogan, image, color, img_scale, img_rotate, img_x, img_y) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         event.name || '',
         event.event_date,
         event.description || '',
         event.slogan || '',
         event.image || '',
-        event.color || '#007AFF'
+        event.color || '#007AFF',
+        event.img_scale || 1.0,
+        event.img_rotate || 0.0,
+        event.img_x || 0.0,
+        event.img_y || 0.0
       );
       return result.lastInsertRowId;
     } catch (error) {
@@ -65,7 +73,8 @@ export const EventService = {
     if (!event.id) return false;
     try {
       db.runSync(
-        `UPDATE events SET name = ?, event_date = ?, description = ?, slogan = ?, image = ?, color = ?, updated_at = CURRENT_TIMESTAMP 
+        `UPDATE events SET name = ?, event_date = ?, description = ?, slogan = ?, image = ?, color = ?, 
+         img_scale = ?, img_rotate = ?, img_x = ?, img_y = ?, updated_at = CURRENT_TIMESTAMP 
          WHERE id = ?`,
         event.name || '',
         event.event_date,
@@ -73,6 +82,10 @@ export const EventService = {
         event.slogan || '',
         event.image || '',
         event.color || '#007AFF',
+        event.img_scale || 1.0,
+        event.img_rotate || 0.0,
+        event.img_x || 0.0,
+        event.img_y || 0.0,
         event.id
       );
       return true;

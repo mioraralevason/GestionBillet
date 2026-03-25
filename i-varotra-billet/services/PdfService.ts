@@ -15,9 +15,6 @@ export const PdfService = {
    * @returns {Promise<boolean>} True if the PDF was generated and shared successfully.
    */
   exportTicketsToPdf: async (event: Event, tickets: Ticket[]) => {
-    // Generate HTML for 3x3 layout (Recto on page 1, Verso on page 2)
-    // For 9 tickets, we need at least 2 pages (or more if more than 9 tickets)
-    
     const themeColor = event.color || '#007AFF';
     
     let htmlContent = `
@@ -57,24 +54,27 @@ export const PdfService = {
           .slogan { font-size: 9pt; font-style: italic; color: ${themeColor}; margin-top: 2mm; }
           .description { font-size: 8pt; color: #444; text-align: left; line-height: 1.2; padding: 2mm; background: rgba(255,255,255,0.7); border-radius: 2mm; z-index: 2; }
           .info-footer { font-size: 7pt; color: #999; border-top: 0.1mm solid #EEE; padding-top: 1mm; width: 100%; z-index: 2; }
-          .verso-image {
+          .verso-image-container {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover;
-            opacity: 0.2;
             z-index: 1;
+            overflow: hidden;
+          }
+          .verso-image {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            opacity: 0.3;
+            transform: scale(${event.img_scale || 1.0}) rotate(${event.img_rotate || 0}deg) translate(${event.img_x || 0}px, ${event.img_y || 0}px);
           }
         </style>
       </head>
       <body>
     `;
 
-    // Split tickets into chunks of 9
     for (let i = 0; i < tickets.length; i += 9) {
       const chunk = tickets.slice(i, i + 9);
       
-      // Rectos page
-      htmlContent += `<div class="page">`;
+      htmlContent += '<div class="page">';
       chunk.forEach(t => {
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(t.qr_code)}`;
         htmlContent += `
@@ -87,15 +87,12 @@ export const PdfService = {
           </div>
         `;
       });
-      // Fill empty cells if chunk < 9
       for (let j = chunk.length; j < 9; j++) {
-        htmlContent += `<div class="ticket"></div>`;
+        htmlContent += '<div class="ticket"></div>';
       }
-      htmlContent += `</div>`;
+      htmlContent += '</div>';
 
-      // Versos page (Mirrored)
-      htmlContent += `<div class="page">`;
-      // To mirror: Row 1 [1,2,3] becomes [3,2,1] on the back
+      htmlContent += '<div class="page">';
       for (let row = 0; row < 3; row++) {
         const rowTickets = chunk.slice(row * 3, row * 3 + 3);
         const fullRow = [...rowTickets];
@@ -105,23 +102,24 @@ export const PdfService = {
           if (t) {
             htmlContent += `
               <div class="ticket ticket-verso">
-                ${event.image ? `<img src="${event.image}" class="verso-image" />` : ''}
+                ${event.image ? `
+                  <div class="verso-image-container">
+                    <img src="${event.image}" class="verso-image" />
+                  </div>
+                ` : ''}
                 <div class="description">${event.description || 'Merci de votre participation !'}</div>
                 <div class="info-footer">Billet : ${t.ticket_number} | Prix : ${t.price} Ar</div>
               </div>
             `;
           } else {
-            htmlContent += `<div class="ticket"></div>`;
+            htmlContent += '<div class="ticket"></div>';
           }
         });
       }
-      htmlContent += `</div>`;
+      htmlContent += '</div>';
     }
 
-    htmlContent += `
-      </body>
-      </html>
-    `;
+    htmlContent += '</body></html>';
 
     try {
       const { uri } = await Print.printToFileAsync({ html: htmlContent });

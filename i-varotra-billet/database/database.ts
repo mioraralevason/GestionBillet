@@ -51,6 +51,16 @@ export const initDB = () => {
       console.log("Adding 'color' column to 'events' table...");
       db.execSync(`ALTER TABLE events ADD COLUMN color TEXT DEFAULT '#007AFF';`);
     }
+
+    // New Migration: Add image transformation columns if missing
+    const hasImageTransformColumns = eventTableInfo.some((column: any) => column.name === 'img_scale');
+    if (eventTableInfo.length > 0 && !hasImageTransformColumns) {
+      console.log("Adding image transformation columns to 'events' table...");
+      db.execSync(`ALTER TABLE events ADD COLUMN img_scale REAL DEFAULT 1.0;`);
+      db.execSync(`ALTER TABLE events ADD COLUMN img_rotate REAL DEFAULT 0.0;`);
+      db.execSync(`ALTER TABLE events ADD COLUMN img_x REAL DEFAULT 0.0;`);
+      db.execSync(`ALTER TABLE events ADD COLUMN img_y REAL DEFAULT 0.0;`);
+    }
   } catch (e) {
     console.error("Migration error", e);
   }
@@ -72,6 +82,10 @@ export const initDB = () => {
       slogan TEXT,
       image TEXT,
       color TEXT DEFAULT '#007AFF',
+      img_scale REAL DEFAULT 1.0,
+      img_rotate REAL DEFAULT 0.0,
+      img_x REAL DEFAULT 0.0,
+      img_y REAL DEFAULT 0.0,
       event_date TEXT NOT NULL,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
