@@ -35,12 +35,12 @@ export const AttendanceService = {
       );
 
       if (!ticket) {
-        return { success: false, message: 'Ticket not found' };
+        return { success: false, message: 'Billet non trouvé' };
       }
 
       // 1. Check if already validated
       if (ticket.status_id === TicketService.STATUS_VALIDE) {
-        return { success: false, message: 'Ticket already used / verified', ticket, warning: true };
+        return { success: false, message: 'Billet déjà utilisé / vérifié', ticket, warning: true };
       }
 
       // 2. Check if fully paid
@@ -48,7 +48,7 @@ export const AttendanceService = {
       if (totalPaid < ticket.price) {
         return { 
           success: false, 
-          message: `Ticket not fully paid (${totalPaid} / ${ticket.price} Ar). Entry refused.`, 
+          message: `Billet non payé intégralement (${totalPaid} / ${ticket.price} Ar). Accès refusé.`, 
           ticket 
         };
       }
@@ -69,12 +69,12 @@ export const AttendanceService = {
 
       return { 
         success: true, 
-        message: 'Valid Ticket! Entry authorized.', 
-        ticket: { ...ticket, status_id: TicketService.STATUS_VALIDE, status_name: 'Validated' } 
+        message: 'Billet Valide ! Accès autorisé.', 
+        ticket: { ...ticket, status_id: TicketService.STATUS_VALIDE, status_name: 'Vérifié' } 
       };
     } catch (error) {
       console.error('Validation error', error);
-      return { success: false, message: 'Error during validation' };
+      return { success: false, message: 'Erreur lors de la validation' };
     }
   },
 
@@ -97,18 +97,18 @@ export const AttendanceService = {
       );
 
       if (!ticket) {
-        return { success: false, message: 'Ticket not found' };
+        return { success: false, message: 'Billet non trouvé' };
       }
 
       if (ticket.status_id === TicketService.STATUS_VALIDE) {
-        return { success: false, message: 'Ticket already used / verified', ticket, warning: true };
+        return { success: false, message: 'Billet déjà utilisé / vérifié', ticket, warning: true };
       }
 
       const totalPaid = ticket.total_paid || 0;
       if (totalPaid < ticket.price) {
         return { 
           success: false, 
-          message: `Ticket not fully paid (${totalPaid} / ${ticket.price} Ar). Entry refused.`, 
+          message: `Billet non payé intégralement (${totalPaid} / ${ticket.price} Ar). Accès refusé.`, 
           ticket 
         };
       }
@@ -128,12 +128,12 @@ export const AttendanceService = {
 
       return { 
         success: true, 
-        message: 'Ticket verified successfully!', 
-        ticket: { ...ticket, status_id: TicketService.STATUS_VALIDE, status_name: 'Validated' } 
+        message: 'Billet vérifié avec succès !', 
+        ticket: { ...ticket, status_id: TicketService.STATUS_VALIDE, status_name: 'Vérifié' } 
       };
     } catch (error) {
       console.error('Manual verification error', error);
-      return { success: false, message: 'Error during verification' };
+      return { success: false, message: 'Erreur lors de la vérification' };
     }
   },
 

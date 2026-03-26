@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initDB } from '../database/database';
 
@@ -9,8 +11,13 @@ export default function Layout() {
   const segments = useSegments();
 
   useEffect(() => {
-    initDB(); // Initialisation de la base SQLite
-    setLoading(false);
+    const initialize = async () => {
+      await initDB(); // Initialisation de la base SQLite
+      // Un court délai pour montrer le logo lors du chargement initial
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setLoading(false);
+    };
+    initialize();
   }, []);
 
   useEffect(() => {
@@ -29,7 +36,18 @@ export default function Layout() {
     checkAuthAndRedirect();
   }, [segments, loading]);
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Image 
+          source={require('../assets/logo_iBillet.png')} 
+          style={styles.loadingLogo}
+          contentFit="contain"
+        />
+        <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 20 }} />
+      </View>
+    );
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -76,3 +94,16 @@ export default function Layout() {
     </Stack>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingLogo: {
+    width: 150,
+    height: 150,
+  },
+});

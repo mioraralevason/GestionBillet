@@ -37,6 +37,19 @@ export const EventService = {
   },
 
   /**
+   * Retrieves the last 10 created events.
+   * @returns {Event[]} An array of event objects.
+   */
+  getRecentCreations: (): Event[] => {
+    try {
+      return db.getAllSync(`SELECT * FROM events ORDER BY created_at DESC LIMIT 10`);
+    } catch (error) {
+      console.error('Error fetching recent events', error);
+      return [];
+    }
+  },
+
+  /**
    * Adds a new event to the database.
    * @param {Event} event - The event data to insert.
    * @returns {number | null} The ID of the newly created event, or null if it failed.

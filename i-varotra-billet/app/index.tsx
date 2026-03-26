@@ -70,12 +70,12 @@ export default function Login() {
       >
         <View style={styles.content}>
           <Image 
-            source={require('../assets/logo.png')} 
+            source={require('../assets/logo_iBillet.png')} 
             style={styles.logo}
             contentFit="contain"
           />
           
-          <Text style={styles.title}>I-Varotra Billet</Text>
+          <Text style={styles.title}>iBillet</Text>
           <Text style={styles.subtitle}>Sécurisez vos accès</Text>
 
           <View style={styles.form}>
@@ -108,7 +108,7 @@ export default function Login() {
             </View>
           </View>
 
-          <Text style={styles.footer}>© 2026 I-Varotra - Connexion Automatique</Text>
+          <Text style={styles.footer}>© 2026 iBillet</Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

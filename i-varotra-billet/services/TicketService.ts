@@ -196,6 +196,24 @@ export const TicketService = {
   },
 
   /**
+   * Retrieves the last 3 ticket activities (assignments or verifications).
+   * @returns {Ticket[]} List of recent ticket activities.
+   */
+  getRecentActivities: (): any[] => {
+    try {
+      return db.getAllSync(
+        `SELECT t.*, s.name as status_name, b.name as buyer_name, e.name as event_name
+         FROM tickets t
+         LEFT JOIN status s ON t.status_id = s.id
+         LEFT JOIN buyers b ON t.buyer_id = b.id
+         LEFT JOIN events e ON t.event_id = e.id
+         WHERE t.status_id IN (${TicketService.STATUS_VENDU}, ${TicketService.STATUS_VALIDE})
+         ORDER BY t.updated_at DESC LIMIT 10`
+      );
+    } catch (error) { return []; }
+  },
+
+  /**
    * Calculates comprehensive statistics for an event including financials.
    * @param {number} eventId - ID of the event.
    * @returns {object} Object containing counts and revenue data.

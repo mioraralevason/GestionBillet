@@ -1,14 +1,97 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, RefreshControl } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  SafeAreaView, 
+  RefreshControl,
+  useColorScheme,
+  StatusBar,
+  TextInput,
+  Platform,
+  Dimensions,
+  Modal
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, Stack } from 'expo-router';
 import { EventService, Event } from '../../services/EventService';
+import { TicketService } from '../../services/TicketService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Colors } from '../../constants/theme';
+
+const { width } = Dimensions.get('window');
+
+const MonthYearPicker = ({ visible, onClose, onSelect, value }: any) => {
+  const [selectedYear, setSelectedYear] = useState(value ? value.getFullYear() : new Date().getFullYear());
+  
+  useEffect(() => {
+    if (value) setSelectedYear(value.getFullYear());
+  }, [value, visible]);
+
+  const months = [
+    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={styles.pickerCard}>
+          <Text style={styles.pickerTitle}>Choisir un mois</Text>
+          <View style={styles.yearSelector}>
+            <TouchableOpacity onPress={() => setSelectedYear(selectedYear - 1)}>
+              <MaterialCommunityIcons name="chevron-left" size={32} color="#6366F1" />
+            </TouchableOpacity>
+            <Text style={styles.yearText}>{selectedYear}</Text>
+            <TouchableOpacity onPress={() => setSelectedYear(selectedYear + 1)}>
+              <MaterialCommunityIcons name="chevron-right" size={32} color="#6366F1" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.monthsGrid}>
+            {months.map((month, index) => {
+              const isSelected = value && value.getMonth() === index && value.getFullYear() === selectedYear;
+              return (
+                <TouchableOpacity 
+                  key={month} 
+                  style={[styles.monthItem, isSelected && styles.monthItemActive]}
+                  onPress={() => {
+                    const date = new Date(selectedYear, index, 1);
+                    onSelect(date);
+                    onClose();
+                  }}
+                >
+                  <Text style={[styles.monthText, isSelected && styles.monthTextActive]}>
+                    {month.substring(0, 4)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <TouchableOpacity style={styles.closePickerBtn} onPress={onClose}>
+            <Text style={styles.closePickerBtnText}>Fermer</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
 export default function Home() {
+  const colorScheme = useColorScheme() || 'dark';
+  const theme = Colors[colorScheme];
+  const currentYear = new Date().getFullYear();
+  
   const [role, setRole] = useState('');
   const [events, setEvents] = useState<Event[]>([]);
+  const [recentCreations, setRecentCreations] = useState<Event[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [startMonthYear, setStartMonthYear] = useState<Date | null>(new Date(currentYear, 0, 1));
+  const [endMonthYear, setEndMonthYear] = useState<Date | null>(new Date(currentYear, 11, 1));
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  
   const router = useRouter();
 
   const fetchData = useCallback(async () => {
@@ -16,13 +99,11 @@ export default function Home() {
     setRole(userRole || 'Utilisateur');
     const allEvents = EventService.getEvents();
     setEvents(allEvents);
+    const recent = EventService.getRecentCreations();
+    setRecentCreations(recent);
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchData();
-    }, [fetchData])
-  );
+  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -30,139 +111,139 @@ export default function Home() {
     setRefreshing(false);
   };
 
-  const handleLogout = async () => {
-    await AsyncStorage.removeItem('userRole');
-    router.replace('/');
-  };
+  const filteredData = useMemo(() => {
+    let filteredEvents = events;
+    if (startMonthYear && endMonthYear) {
+      const startVal = startMonthYear.getFullYear() * 12 + startMonthYear.getMonth();
+      const endVal = endMonthYear.getFullYear() * 12 + endMonthYear.getMonth();
+      filteredEvents = events.filter(e => {
+        const d = new Date(e.event_date);
+        const currentVal = d.getFullYear() * 12 + d.getMonth();
+        return currentVal >= startVal && currentVal <= endVal;
+      });
+    }
+    
+    // Historique des créations filtré par la même période
+    let filteredHistory = recentCreations;
+    if (startMonthYear && endMonthYear) {
+        const startVal = startMonthYear.getFullYear() * 12 + startMonthYear.getMonth();
+        const endVal = endMonthYear.getFullYear() * 12 + endMonthYear.getMonth();
+        filteredHistory = recentCreations.filter(e => {
+            const d = e.created_at ? new Date(e.created_at) : new Date();
+            const val = d.getFullYear() * 12 + d.getMonth();
+            return val >= startVal && val <= endVal;
+        });
+    }
 
-  // Logique du tableau de bord
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
+    return { filteredEvents, filteredHistory };
+  }, [startMonthYear, endMonthYear, events, recentCreations]);
 
-  const upcomingEvents = events
-    .filter(e => new Date(e.event_date) >= now)
-    .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
+  const soldTickets = filteredData.filteredEvents.reduce((acc, e) => {
+    const stats = TicketService.getEventStats(e.id!);
+    return acc + stats.sold + stats.validated;
+  }, 0);
 
-  const pastEvents = events
-    .filter(e => new Date(e.event_date) < now)
-    .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime());
+  const totalPossibleTickets = filteredData.filteredEvents.reduce((acc, e) => {
+    const stats = TicketService.getEventStats(e.id!);
+    return acc + stats.total;
+  }, 0);
 
-  const closestEvent = upcomingEvents.length > 0 ? upcomingEvents[0] : null;
-  const lastEvent = pastEvents.length > 0 ? pastEvents[0] : null;
-
-  const getDaysRemaining = (dateStr: string) => {
-    const eventDate = new Date(dateStr);
-    eventDate.setHours(0, 0, 0, 0);
-    const diffTime = eventDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+  const formatMonthYear = (date: Date | null) => {
+    if (!date) return 'MM/AAAA';
+    const m = date.toLocaleDateString('fr-FR', { month: 'long' });
+    return `${m.charAt(0).toUpperCase() + m.slice(1)} ${date.getFullYear()}`;
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: '#000000' }]}>
+      <StatusBar barStyle="light-content" />
+      <Stack.Screen 
+        options={{
+          headerTitle: 'iBillet',
+          headerRight: () => (
+            <TouchableOpacity 
+              onPress={() => router.push({ pathname: '/(tabs)/events', params: { autoSearch: 'true' } })} 
+              style={{ marginRight: 20 }}
+            >
+              <MaterialCommunityIcons name="magnify" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
+          )
+        }}
+      />
+
       <ScrollView 
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.tint} />}
       >
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.welcome}>Bonjour,</Text>
-            <Text style={styles.roleName}>{role.toUpperCase()}</Text>
-          </View>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-            <MaterialCommunityIcons name="logout" size={24} color="#FF3B30" />
-          </TouchableOpacity>
-        </View>
+        <View style={styles.content}>
+          <Text style={styles.welcomeText}>Agent iBillet</Text>
 
-        <View style={styles.dashboard}>
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: '#007AFF' }]}>
-              <MaterialCommunityIcons name="calendar-multiselect" size={30} color="#FFF" />
-              <Text style={styles.statNumber}>{events.length}</Text>
-              <Text style={styles.statLabel}>Événements</Text>
+          <View style={styles.dateFilterContainer}>
+            <View style={styles.datePickerRow}>
+              <TouchableOpacity style={[styles.dateBtn, styles.dateBtnActive]} onPress={() => setShowStartPicker(true)}>
+                <MaterialCommunityIcons name="calendar-import" size={18} color="#A5B4FC" />
+                <Text style={styles.dateBtnText}>{formatMonthYear(startMonthYear)}</Text>
+              </TouchableOpacity>
+              <MaterialCommunityIcons name="arrow-right" size={16} color="#4B5563" />
+              <TouchableOpacity style={[styles.dateBtn, styles.dateBtnActive]} onPress={() => setShowEndPicker(true)}>
+                <MaterialCommunityIcons name="calendar-export" size={18} color="#A5B4FC" />
+                <Text style={styles.dateBtnText}>{formatMonthYear(endMonthYear)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.resetBtn} onPress={() => { setStartMonthYear(new Date(currentYear, 0, 1)); setEndMonthYear(new Date(currentYear, 11, 1)); }}>
+                <MaterialCommunityIcons name="refresh" size={20} color="#6366F1" />
+              </TouchableOpacity>
             </View>
-            <View style={[styles.statCard, { backgroundColor: '#34C759' }]}>
-              <MaterialCommunityIcons name="ticket-confirmation" size={30} color="#FFF" />
-              <Text style={styles.statNumber}>{upcomingEvents.length}</Text>
-              <Text style={styles.statLabel}>À venir</Text>
-            </View>
+            <Text style={styles.dateHint}>Période : Janv. - Déc. {currentYear}</Text>
           </View>
 
-          {closestEvent && (
-            <View style={styles.mainCard}>
-              <View style={styles.cardHeader}>
-                <MaterialCommunityIcons name="clock-fast" size={24} color="#007AFF" />
-                <Text style={styles.cardTitle}>Prochain Événement</Text>
+          <MonthYearPicker visible={showStartPicker} onClose={() => setShowStartPicker(false)} onSelect={setStartMonthYear} value={startMonthYear} />
+          <MonthYearPicker visible={showEndPicker} onClose={() => setShowEndPicker(false)} onSelect={setEndMonthYear} value={endMonthYear} />
+
+          <View style={styles.mainCard}>
+            <Text style={styles.mainCardLabel}>Événements trouvés</Text>
+            <Text style={styles.mainCardValue}>{filteredData.filteredEvents.length}</Text>
+            <View style={styles.cardDivider} />
+            <View style={styles.cardFooter}>
+              <View style={styles.cardFooterItem}>
+                <Text style={styles.footerLabel}>Billets vendus</Text>
+                <Text style={styles.footerValue}>{soldTickets}</Text>
               </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.eventName}>{closestEvent.name}</Text>
-                <Text style={styles.eventDate}>📅 {closestEvent.event_date}</Text>
-                <View style={styles.countdownBadge}>
-                  <Text style={styles.countdownText}>
-                    {getDaysRemaining(closestEvent.event_date) === 0 
-                      ? "AUJOURD'HUI" 
-                      : `J - ${getDaysRemaining(closestEvent.event_date)} JOURS`}
+              <View style={styles.cardFooterItem}>
+                <Text style={styles.footerLabel}>Remplissage</Text>
+                <Text style={styles.footerValue}>{totalPossibleTickets > 0 ? Math.round((soldTickets / totalPossibleTickets) * 100) : 0}%</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Historique d'événements</Text>
+            <TouchableOpacity onPress={() => router.push('/events')}>
+              <Text style={styles.viewAllText}>Voir tout</Text>
+            </TouchableOpacity>
+          </View>
+
+          {filteredData.filteredHistory.length > 0 ? (
+            filteredData.filteredHistory.map((event, index) => (
+              <TouchableOpacity key={index} style={styles.operationItem} onPress={() => router.push(`/event/${event.id}`)}>
+                <View style={[styles.operationIconContainer, { borderColor: event.color || '#A5B4FC' }]}>
+                  <MaterialCommunityIcons name="calendar-plus" size={22} color={event.color || "#A5B4FC"} />
+                </View>
+                <View style={styles.operationContent}>
+                  <Text style={styles.operationTitle}>{event.name}</Text>
+                  <Text style={styles.operationSubtitle}>
+                    Créé le {new Date(event.created_at || '').toLocaleDateString('fr-FR')} pour le {new Date(event.event_date).toLocaleDateString('fr-FR')}
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.detailsBtn}
-                onPress={() => router.push(`/event/${closestEvent.id}`)}
-              >
-                <Text style={styles.detailsBtnText}>Voir détails</Text>
-                <MaterialCommunityIcons name="chevron-right" size={20} color="#007AFF" />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {lastEvent && (
-            <View style={[styles.mainCard, { borderLeftColor: '#8E8E93' }]}>
-              <View style={styles.cardHeader}>
-                <MaterialCommunityIcons name="history" size={24} color="#8E8E93" />
-                <Text style={[styles.cardTitle, { color: '#8E8E93' }]}>Dernier Passé</Text>
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={[styles.eventName, { color: '#666' }]}>{lastEvent.name}</Text>
-                <Text style={styles.eventDate}>{lastEvent.event_date}</Text>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.shortcuts}>
-            <Text style={styles.sectionTitle}>Raccourcis</Text>
-            <View style={styles.shortcutGrid}>
-              <TouchableOpacity style={styles.shortcutItem} onPress={() => router.push('/verifier')}>
-                <View style={[styles.shortcutIcon, { backgroundColor: '#FF9500' }]}>
-                  <MaterialCommunityIcons name="qrcode-scan" size={24} color="#FFF" />
+                <View style={styles.timeContainer}>
+                  <Text style={styles.timeText}>
+                    {event.created_at ? new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                  </Text>
                 </View>
-                <Text style={styles.shortcutLabel}>Scanner</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity style={styles.shortcutItem} onPress={() => router.push('/calendar')}>
-                <View style={[styles.shortcutIcon, { backgroundColor: '#5AC8FA' }]}>
-                  <MaterialCommunityIcons name="calendar-month" size={24} color="#FFF" />
-                </View>
-                <Text style={styles.shortcutLabel}>Calendrier</Text>
-              </TouchableOpacity>
-
-              {role === 'admin' && (
-                <>
-                  <TouchableOpacity style={styles.shortcutItem} onPress={() => router.push('/events')}>
-                    <View style={[styles.shortcutIcon, { backgroundColor: '#5856D6' }]}>
-                      <MaterialCommunityIcons name="format-list-bulleted" size={24} color="#FFF" />
-                    </View>
-                    <Text style={styles.shortcutLabel}>Liste</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.shortcutItem} onPress={() => router.push('/buyers')}>
-                    <View style={[styles.shortcutIcon, { backgroundColor: '#AF52DE' }]}>
-                      <MaterialCommunityIcons name="account-group" size={24} color="#FFF" />
-                    </View>
-                    <Text style={styles.shortcutLabel}>Acheteurs</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          </View>
+            ))
+          ) : (
+            <Text style={styles.emptyText}>Aucun événement créé sur cette période</Text>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -170,80 +251,46 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F2F2F7' },
-  scroll: { paddingBottom: 30 },
-  header: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: 25, 
-    backgroundColor: '#FFF',
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10
-  },
-  welcome: { fontSize: 16, color: '#8E8E93' },
-  roleName: { fontSize: 24, fontWeight: 'bold', color: '#1C1C1E' },
-  logoutBtn: { padding: 10, borderRadius: 12, backgroundColor: '#FFF5F5' },
-  dashboard: { padding: 20 },
-  statsRow: { flexDirection: 'row', gap: 15, marginBottom: 20 },
-  statCard: { 
-    flex: 1, 
-    padding: 20, 
-    borderRadius: 20, 
-    alignItems: 'center',
-    elevation: 3
-  },
-  statNumber: { fontSize: 28, fontWeight: 'bold', color: '#FFF', marginTop: 5 },
-  statLabel: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
-  mainCard: { 
-    backgroundColor: '#FFF', 
-    borderRadius: 20, 
-    padding: 20, 
-    marginBottom: 20, 
-    borderLeftWidth: 5, 
-    borderLeftColor: '#007AFF',
-    elevation: 2
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 15 },
-  cardTitle: { fontSize: 14, fontWeight: 'bold', color: '#007AFF', textTransform: 'uppercase' },
-  cardContent: { marginBottom: 15 },
-  eventName: { fontSize: 20, fontWeight: 'bold', color: '#1C1C1E', marginBottom: 5 },
-  eventDate: { fontSize: 15, color: '#8E8E93' },
-  countdownBadge: { 
-    alignSelf: 'flex-start', 
-    backgroundColor: '#E1F0FF', 
-    paddingHorizontal: 12, 
-    paddingVertical: 6, 
-    borderRadius: 10, 
-    marginTop: 10 
-  },
-  countdownText: { color: '#007AFF', fontWeight: 'bold', fontSize: 13 },
-  detailsBtn: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'flex-end', 
-    borderTopWidth: 1, 
-    borderTopColor: '#F2F2F7', 
-    paddingTop: 10 
-  },
-  detailsBtnText: { color: '#007AFF', fontWeight: '600', marginRight: 5 },
-  shortcuts: { marginTop: 10 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1C1C1E', marginBottom: 15 },
-  shortcutGrid: { flexDirection: 'row', gap: 15 },
-  shortcutItem: { alignItems: 'center', flex: 1 },
-  shortcutIcon: { 
-    width: 60, 
-    height: 60, 
-    borderRadius: 18, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 8,
-    elevation: 2
-  },
-  shortcutLabel: { fontSize: 12, fontWeight: '600', color: '#1C1C1E' }
+  container: { flex: 1 },
+  scroll: { paddingBottom: 120 },
+  content: { padding: 20 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
+  pickerCard: { backgroundColor: '#111827', width: width * 0.85, borderRadius: 25, padding: 20, borderWidth: 1, borderColor: '#1E293B' },
+  pickerTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+  yearSelector: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 30, marginBottom: 25 },
+  yearText: { color: '#FFF', fontSize: 26, fontWeight: '900' },
+  monthsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  monthItem: { width: '30%', backgroundColor: '#1E293B', paddingVertical: 15, borderRadius: 15, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
+  monthItemActive: { backgroundColor: '#6366F1', borderColor: '#818CF8' },
+  monthText: { color: '#94A3B8', fontWeight: 'bold', fontSize: 14 },
+  monthTextActive: { color: '#FFF' },
+  closePickerBtn: { marginTop: 10, padding: 10, alignItems: 'center' },
+  closePickerBtnText: { color: '#64748B', fontWeight: 'bold' },
+  welcomeText: { color: '#FFFFFF', fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
+  dateFilterContainer: { marginBottom: 25 },
+  datePickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  dateBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#111827', borderRadius: 12, padding: 12, gap: 8, borderWidth: 1, borderColor: '#1E293B' },
+  dateBtnActive: { borderColor: '#334155' },
+  dateBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
+  dateHint: { color: '#4B5563', fontSize: 11, marginTop: 5, marginLeft: 5 },
+  resetBtn: { padding: 10, backgroundColor: '#6366F115', borderRadius: 10 },
+  mainCard: { backgroundColor: '#6366F1', borderRadius: 25, padding: 25, paddingVertical: 35, marginBottom: 30, elevation: 10 },
+  mainCardLabel: { color: '#E0E7FF', fontSize: 14, textAlign: 'center', marginBottom: 10 },
+  mainCardValue: { color: '#FFFFFF', fontSize: 48, fontWeight: 'bold', textAlign: 'center' },
+  cardDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 25 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-around' },
+  cardFooterItem: { alignItems: 'center' },
+  footerLabel: { color: '#E0E7FF', fontSize: 12, marginBottom: 5 },
+  footerValue: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+  sectionTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  viewAllText: { color: '#6366F1', fontSize: 14, fontWeight: 'bold' },
+  operationItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#1E293B' },
+  operationIconContainer: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: '#334155', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  operationContent: { flex: 1 },
+  operationTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  operationSubtitle: { color: '#94A3B8', fontSize: 12 },
+  timeContainer: { paddingLeft: 10 },
+  timeText: { color: '#94A3B8', fontSize: 12, fontWeight: 'bold' },
+  emptyText: { color: '#64748B', textAlign: 'center', marginTop: 20, fontStyle: 'italic' }
 });

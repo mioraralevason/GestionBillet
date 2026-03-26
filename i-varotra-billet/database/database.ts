@@ -44,6 +44,9 @@ export const initDB = () => {
       db.execSync(`DROP TABLE IF EXISTS users;`);
     }
 
+    // Migration: Rename 'Validé' to 'Vérifié' in status table
+    db.runSync(`UPDATE status SET name = 'Vérifié' WHERE name = 'Validé'`);
+
     // New Migration: Add 'color' column to 'events' if it doesn't exist
     const eventTableInfo: any[] = db.getAllSync(`PRAGMA table_info(events)`);
     const hasColorColumn = eventTableInfo.some((column: any) => column.name === 'color');
@@ -161,11 +164,11 @@ export const initDB = () => {
     db.runSync(`INSERT INTO users (pin, role) VALUES (?, ?)`, '0000', 'verificateur');
   }
 
-  const existingStatus = db.getFirstSync(`SELECT * FROM status LIMIT 1`);
-  if (!existingStatus) {
+  const statusList = db.getAllSync(`SELECT * FROM status`);
+  if (statusList.length === 0) {
     db.runSync(`INSERT INTO status (name, type) VALUES (?, ?)`, 'Disponible', 'ticket');
     db.runSync(`INSERT INTO status (name, type) VALUES (?, ?)`, 'Vendu', 'ticket');
-    db.runSync(`INSERT INTO status (name, type) VALUES (?, ?)`, 'Validé', 'attendance');
+    db.runSync(`INSERT INTO status (name, type) VALUES (?, ?)`, 'Vérifié', 'attendance');
   }
 };
 
@@ -180,6 +183,23 @@ export const getUserByPin = (pin: string, callback: (role: string | null) => voi
     const row: any = db.getFirstSync(`SELECT role FROM users WHERE pin = ?`, pin);
     callback(row ? row.role : null);
   } catch (error) { console.error(error); callback(null); }
+};
+
+/**
+ * Updates the PIN code for a specific role.
+ * @param {string} role - The user role (admin or verificateur).
+ * @param {string} newPin - The new 4-digit PIN.
+ * @returns {boolean} Success status.
+ */
+export const updateUserPin = (role: string, newPin: string): boolean => {
+  if (Platform.OS === 'web') return false;
+  try {
+    db.runSync(`UPDATE users SET pin = ? WHERE role = ?`, newPin, role);
+    return true;
+  } catch (error) {
+    console.error('Error updating PIN', error);
+    return false;
+  }
 };
 
 export default db;

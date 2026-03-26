@@ -1,10 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { TouchableOpacity, View, useColorScheme, StyleSheet, Platform, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors } from '../../constants/theme';
+import { CustomSidebar } from '../../components/CustomSidebar';
 
 export default function TabsLayout() {
   const [role, setRole] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const colorScheme = useColorScheme() || 'dark';
+  const theme = Colors[colorScheme];
+
+  // Couleurs Electro / Premium
+  const activeColor = '#FFFFFF'; // Texte blanc sur fond coloré
+  const inactiveColor = '#64748B'; // Gris ardoise éteint
+  const barBg = '#0F172A'; // Bleu nuit très profond
+  const activePillBg = '#6366F1'; // Indigo vif pour l'élément actif
 
   useEffect(() => {
     const getRole = async () => {
@@ -14,60 +26,144 @@ export default function TabsLayout() {
     getRole();
   }, []);
 
+  const darkHeaderOptions = {
+    headerShown: true,
+    headerStyle: { 
+      backgroundColor: '#000000', 
+      elevation: 0,
+      shadowOpacity: 0,
+      borderBottomWidth: 1,
+      borderBottomColor: '#1E293B',
+    },
+    headerTintColor: '#FFFFFF',
+    headerTitleStyle: {
+      fontWeight: 'bold' as const,
+      fontSize: 18,
+    },
+    headerLeft: () => (
+      <TouchableOpacity 
+        style={{ marginLeft: 20 }} 
+        onPress={() => setIsSidebarOpen(true)}
+      >
+        <MaterialCommunityIcons name="menu" size={26} color="#FFFFFF" />
+      </TouchableOpacity>
+    ),
+  };
+
+  const TabIconWithLabel = ({ focused, icon, label }: { focused: boolean, icon: any, label: string }) => {
+    return (
+      <View style={[
+        styles.tabItem, 
+        focused && { backgroundColor: activePillBg, shadowColor: activePillBg, shadowOpacity: 0.5, shadowRadius: 10, elevation: 5 }
+      ]}>
+        <MaterialCommunityIcons 
+          name={icon} 
+          color={focused ? activeColor : inactiveColor} 
+          size={22} 
+        />
+        {focused && (
+          <Text style={[styles.tabLabel, { color: activeColor }]}>{label}</Text>
+        )}
+      </View>
+    );
+  };
+
   return (
-    <Tabs screenOptions={{ 
-      headerShown: true,
-      tabBarActiveTintColor: '#007AFF',
-      tabBarInactiveTintColor: '#8E8E93',
-    }}>
-      <Tabs.Screen 
-        name="home" 
-        options={{ 
-          title: 'Accueil',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home" color={color} size={size} />
-          ),
-        }} 
+    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+      <Tabs screenOptions={{ 
+        ...darkHeaderOptions,
+        tabBarActiveTintColor: activeColor,
+        tabBarInactiveTintColor: inactiveColor,
+        tabBarShowLabel: false,
+        tabBarStyle: {
+          position: 'absolute',
+          bottom: 25,
+          left: 20,
+          right: 20,
+          elevation: 20,
+          backgroundColor: barBg,
+          borderRadius: 30,
+          height: 65,
+          borderTopWidth: 0,
+          borderWidth: 1,
+          borderColor: '#1E293B',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.5,
+          shadowRadius: 20,
+          paddingBottom: 0,
+        },
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: 65,
+        }
+      }}>
+        <Tabs.Screen 
+          name="home" 
+          options={{ 
+            title: 'iBillet',
+            headerTitleAlign: 'center',
+            headerRight: () => (
+              <TouchableOpacity style={{ marginRight: 20 }}>
+                <MaterialCommunityIcons name="white-balance-sunny" size={24} color="#FDB813" />
+              </TouchableOpacity>
+            ),
+            tabBarIcon: ({ focused }) => (
+              <TabIconWithLabel focused={focused} icon="home-variant" label="Accueil" />
+            ),
+          }} 
+        />
+
+        <Tabs.Screen 
+          name="events" 
+          options={{ 
+            title: 'Événements',
+            headerTitleAlign: 'center',
+            tabBarIcon: ({ focused }) => (
+              <TabIconWithLabel focused={focused} icon="calendar-text" label="Events" />
+            ),
+          }} 
+        />
+
+        <Tabs.Screen 
+          name="verifier" 
+          options={{ 
+            title: 'Scanner',
+            headerTitleAlign: 'center',
+            tabBarIcon: ({ focused }) => (
+              <TabIconWithLabel focused={focused} icon="qrcode-scan" label="Scan" />
+            ),
+          }} 
+        />
+
+        <Tabs.Screen name="calendar" options={{ href: null }} />
+        <Tabs.Screen name="buyers" options={{ href: null }} />
+      </Tabs>
+
+      <CustomSidebar 
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)} 
+        role={role} 
       />
-      <Tabs.Screen 
-        name="calendar" 
-        options={{ 
-          title: 'Calendrier',
-          href: role === 'verificateur' ? null : '/(tabs)/calendar',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="calendar-month" color={color} size={size} />
-          ),
-        }} 
-      />
-      <Tabs.Screen 
-        name="events" 
-        options={{ 
-          title: 'Événements',
-          href: role === 'verificateur' ? null : '/(tabs)/events',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="format-list-bulleted" color={color} size={size} />
-          ),
-        }} 
-      />
-      <Tabs.Screen 
-        name="buyers" 
-        options={{ 
-          title: 'Acheteurs',
-          href: role === 'verificateur' ? null : '/(tabs)/buyers',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account-group" color={color} size={size} />
-          ),
-        }} 
-      />
-      <Tabs.Screen 
-        name="verifier" 
-        options={{ 
-          title: 'Vérifier',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="qrcode-scan" color={color} size={size} />
-          ),
-        }} 
-      />
-    </Tabs>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  tabItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+  },
+  tabLabel: {
+    marginLeft: 8,
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  }
+});

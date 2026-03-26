@@ -1,12 +1,11 @@
 /**
  * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
  */
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+const tintColorLight = '#007AFF';
+const tintColorDark = '#00E5FF'; // Cyan pour le style "électro"
 
 export const Colors = {
   light: {
@@ -16,26 +15,38 @@ export const Colors = {
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
+    card: '#F8F9FA',
+    border: '#E9ECEF',
+    header: '#FFFFFF',
+    primary: '#007AFF',
+    secondary: '#5856D6',
+    success: '#34C759',
+    danger: '#FF3B30',
+    warning: '#FF9500',
   },
   dark: {
     text: '#ECEDEE',
-    background: '#151718',
+    background: '#0D1117', // Plus sombre pour le style moderne/électro
     tint: tintColorDark,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    card: '#161B22',
+    border: '#30363D',
+    header: '#010409',
+    primary: '#00E5FF',
+    secondary: '#7000FF',
+    success: '#00FF94',
+    danger: '#FF2E63',
+    warning: '#FFE600',
   },
 };
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
