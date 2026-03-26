@@ -24,7 +24,17 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   onResetVerification
 }) => {
   const colorScheme = useColorScheme() || 'light';
-  const theme = Colors[colorScheme];
+  const theme = {
+    ...Colors[colorScheme],
+    background: '#000000',
+    card: '#111827',
+    border: '#1E293B',
+    text: '#FFFFFF',
+    icon: '#94A3B8',
+    tint: '#6366F1',
+    success: '#10B981',
+    danger: '#FF2E63'
+  };
   
   const statusText = item.status_name || 'Inconnu';
   const isVerified = statusText.toLowerCase().includes('vérifié') || statusText.toLowerCase().includes('validé');
@@ -51,10 +61,10 @@ export const TicketCard: React.FC<TicketCardProps> = ({
       <View style={styles.leftContent}>
         <View style={styles.row}>
           {selectionMode && (
-            <MaterialCommunityIcons 
-              name={isSelected ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"} 
-              size={22} 
-              color={isSelected ? theme.tint : theme.icon} 
+            <MaterialCommunityIcons
+              name={isSelected ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"}
+              size={22}
+              color={isSelected ? theme.tint : theme.icon}
               style={{ marginRight: 10 }}
             />
           )}
@@ -64,8 +74,8 @@ export const TicketCard: React.FC<TicketCardProps> = ({
               <MaterialCommunityIcons name="check-decagram" size={14} color={theme.success} />
               <Text style={[styles.verifiedLabel, { color: theme.success }]}>Vérifié</Text>
               {(role === 'admin' || role === 'verificateur') && onResetVerification && (
-                <TouchableOpacity 
-                  style={[styles.resetBtn, { borderColor: theme.tint }]} 
+                <TouchableOpacity
+                  style={[styles.resetBtn, { borderColor: theme.tint }]}
                   onPress={() => onResetVerification(item)}
                 >
                   <MaterialCommunityIcons name="refresh" size={12} color={theme.tint} />
@@ -74,6 +84,12 @@ export const TicketCard: React.FC<TicketCardProps> = ({
             </View>
           )}
         </View>
+        {item.ticket_type_name && (
+          <View style={styles.ticketTypeBadge}>
+            <MaterialCommunityIcons name="tag" size={12} color={theme.tint} />
+            <Text style={[styles.ticketTypeText, { color: theme.tint }]}>{item.ticket_type_name}</Text>
+          </View>
+        )}
         <Text style={[styles.buyerName, { color: theme.icon }]}>
           {item.buyer_name || 'Disponible'}
         </Text>
@@ -118,6 +134,8 @@ const styles = StyleSheet.create({
   leftContent: { flex: 1 },
   row: { flexDirection: 'row', alignItems: 'center' },
   ticketNum: { fontSize: 17, fontWeight: '700' },
+  ticketTypeBadge: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 },
+  ticketTypeText: { fontSize: 12, fontWeight: '600' },
   verifiedBadge: { 
     flexDirection: 'row', 
     alignItems: 'center', 
@@ -150,7 +168,7 @@ const styles = StyleSheet.create({
     minWidth: 70,
     alignItems: 'center'
   },
-  statusText: { color: '#000', fontSize: 10, fontWeight: '900' },
+  statusText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
   price: { fontSize: 16, fontWeight: '800' },
   remaining: { fontSize: 11, fontWeight: '600', marginTop: 3 },
 });

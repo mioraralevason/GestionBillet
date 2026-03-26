@@ -55,8 +55,8 @@ export default function About() {
 
         <View style={styles.footer}>
           <Text style={styles.copyright}>© 2026 iBillet. Tous droits réservés.</Text>
-          <TouchableOpacity onPress={() => Linking.openURL('https://ibillet.mg')}>
-            <Text style={styles.link}>www.ibillet.mg</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('tel:0337691314')}>
+            <Text style={styles.link}>📞 033 76 913 14</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -66,14 +66,15 @@ export default function About() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
-  header: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    padding: 20, 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#1E293B' 
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B'
   },
-  backBtn: { marginRight: 15 },
+  backBtn: { marginRight: 15, padding: 5 },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
   content: { padding: 30 },
   logoContainer: { alignItems: 'center', marginBottom: 40 },

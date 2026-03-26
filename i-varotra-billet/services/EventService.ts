@@ -20,6 +20,18 @@ export interface Event {
 }
 
 /**
+ * Represents a type of ticket for an event.
+ */
+export interface TicketType {
+  id?: number;
+  event_id: number;
+  name: string;
+  price: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
  * Service handling event-related database operations.
  */
 export const EventService = {
@@ -33,6 +45,40 @@ export const EventService = {
     } catch (error) {
       console.error('Error fetching events', error);
       return [];
+    }
+  },
+
+  /**
+   * Retrieves all ticket types for a specific event.
+   * @param {number} eventId - The ID of the event.
+   * @returns {TicketType[]} An array of ticket type objects.
+   */
+  getTicketTypes: (eventId: number): TicketType[] => {
+    try {
+      return db.getAllSync(`SELECT * FROM ticket_types WHERE event_id = ?`, eventId);
+    } catch (error) {
+      console.error('Error fetching ticket types', error);
+      return [];
+    }
+  },
+
+  /**
+   * Adds a new ticket type to an event.
+   * @param {TicketType} type - The ticket type data to insert.
+   * @returns {number | null} The ID of the newly created ticket type.
+   */
+  addTicketType: (type: TicketType): number | null => {
+    try {
+      const result = db.runSync(
+        `INSERT INTO ticket_types (event_id, name, price) VALUES (?, ?, ?)`,
+        type.event_id,
+        type.name,
+        type.price
+      );
+      return result.lastInsertRowId;
+    } catch (error) {
+      console.error('Error adding ticket type', error);
+      return null;
     }
   },
 
@@ -119,6 +165,57 @@ export const EventService = {
       return true;
     } catch (error) {
       console.error('Error deleting event', error);
+      return false;
+    }
+  },
+
+  /**
+   * Updates an existing ticket type.
+   * @param {TicketType} type - The ticket type data to update (must include id).
+   * @returns {boolean} True if the update was successful.
+   */
+  updateTicketType: (type: TicketType): boolean => {
+    if (!type.id) return false;
+    try {
+      db.runSync(
+        `UPDATE ticket_types SET name = ?, price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        type.name,
+        type.price,
+        type.id
+      );
+      return true;
+    } catch (error) {
+      console.error('Error updating ticket type', error);
+      return false;
+    }
+  },
+
+  /**
+   * Deletes a ticket type from the database.
+   * @param {number} id - The unique identifier of the ticket type.
+   * @returns {boolean} True if deletion was successful.
+   */
+  deleteTicketType: (id: number): boolean => {
+    try {
+      db.runSync(`DELETE FROM ticket_types WHERE id = ?`, id);
+      return true;
+    } catch (error) {
+      console.error('Error deleting ticket type', error);
+      return false;
+    }
+  },
+
+  /**
+   * Deletes all ticket types for a specific event.
+   * @param {number} eventId - The ID of the event.
+   * @returns {boolean} True if deletion was successful.
+   */
+  deleteTicketTypesByEvent: (eventId: number): boolean => {
+    try {
+      db.runSync(`DELETE FROM ticket_types WHERE event_id = ?`, eventId);
+      return true;
+    } catch (error) {
+      console.error('Error deleting ticket types by event', error);
       return false;
     }
   }

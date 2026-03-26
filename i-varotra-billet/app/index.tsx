@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TextInput, Text, Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Vibration } from 'react-native';
+import { View, TextInput, Text, Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Vibration, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserByPin } from '../database/database';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function Login() {
   const [pin, setPin] = useState('');
@@ -13,7 +14,6 @@ export default function Login() {
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    // S'assurer que le clavier est toujours présent
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -31,23 +31,17 @@ export default function Login() {
   const processLogin = (code: string) => {
     getUserByPin(code, async (role) => {
       if (role) {
-        // Succès : Vibration légère et redirection
         if (Platform.OS !== 'web') {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
         await AsyncStorage.setItem('userRole', role);
-        
-        // Redirection intelligente selon le rôle si nécessaire, 
-        // ici on va vers home qui gère l'affichage selon le rôle
         router.replace('/(tabs)/home');
       } else {
-        // Échec : Vibration forte et erreur
         if (Platform.OS !== 'web') {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           Vibration.vibrate(400);
         }
-        
-        Alert.alert('Erreur', 'PIN incorrect. Accès refusé.', [
+        Alert.alert('Accès refusé', 'Le code PIN est incorrect.', [
           { text: 'Réessayer', onPress: () => {
             setPin('');
             inputRef.current?.focus();
@@ -59,133 +53,173 @@ export default function Login() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <StatusBar style="dark" />
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer} 
-        keyboardShouldPersistTaps="always"
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="light" />
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
-        <View style={styles.content}>
-          <Image 
-            source={require('../assets/logo_iBillet.png')} 
-            style={styles.logo}
-            contentFit="contain"
-          />
-          
-          <Text style={styles.title}>iBillet</Text>
-          <Text style={styles.subtitle}>Sécurisez vos accès</Text>
-
-          <View style={styles.form}>
-            <Text style={styles.label}>Entrez votre PIN à 4 chiffres</Text>
-            <TextInput
-              ref={inputRef}
-              value={pin}
-              onChangeText={handlePinChange}
-              keyboardType="numeric"
-              maxLength={4}
-              secureTextEntry
-              autoFocus={true}
-              showSoftInputOnFocus={true}
-              placeholder="••••"
-              placeholderTextColor="#CCC"
-              style={styles.input}
-              onBlur={() => inputRef.current?.focus()} // Garde le focus même si on clique ailleurs
-            />
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer} 
+          keyboardShouldPersistTaps="always"
+        >
+          <View style={styles.content}>
+            {/* Logo Section */}
+            <View style={styles.logoBox}>
+              <Image 
+                source={require('../assets/logo_iBillet.png')} 
+                style={styles.logo}
+                contentFit="contain"
+              />
+            </View>
             
-            <View style={styles.pinIndicatorContainer}>
-              {[...Array(4)].map((_, i) => (
-                <View 
-                  key={i} 
-                  style={[
-                    styles.pinDot, 
-                    pin.length > i ? styles.pinDotFilled : styles.pinDotEmpty
-                  ]} 
-                />
-              ))}
+            <Text style={styles.title}>iBillet</Text>
+            <Text style={styles.subtitle}>Gestion de billetterie intelligente</Text>
+
+            <View style={styles.form}>
+              <Text style={styles.label}>ENTREZ VOTRE PIN DE SÉCURITÉ</Text>
+              
+              <TextInput
+                ref={inputRef}
+                value={pin}
+                onChangeText={handlePinChange}
+                keyboardType="numeric"
+                maxLength={4}
+                secureTextEntry
+                autoFocus={true}
+                showSoftInputOnFocus={true}
+                style={styles.hiddenInput}
+                onBlur={() => inputRef.current?.focus()}
+              />
+              
+              <View style={styles.pinIndicatorContainer}>
+                {[...Array(4)].map((_, i) => (
+                  <View 
+                    key={i} 
+                    style={[
+                      styles.pinDot, 
+                      pin.length > i ? styles.pinDotFilled : styles.pinDotEmpty
+                    ]} 
+                  >
+                    {pin.length > i && (
+                      <MaterialCommunityIcons name="shield-check" size={16} color="#000" />
+                    )}
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>© 2026 iBillet</Text>
+              <Text style={styles.footerSubtext}>Réservation basée sur le numéro de téléphone</Text>
             </View>
           </View>
-
-          <Text style={styles.footer}>© 2026 iBillet</Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#000000',
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
   },
   content: {
-    padding: 30,
+    padding: 40,
     alignItems: 'center',
   },
+  logoBox: {
+    width: 120,
+    height: 120,
+    borderRadius: 30,
+    backgroundColor: '#111827',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 5,
+  },
   logo: {
-    width: 100,
-    height: 100,
-    marginBottom: 15,
+    width: 80,
+    height: 80,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    marginBottom: 5,
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    letterSpacing: 1,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 40,
+    fontSize: 15,
+    color: '#94A3B8',
+    marginBottom: 60,
     textAlign: 'center',
+    fontWeight: '500',
   },
   form: {
     width: '100%',
-    maxWidth: 320,
     alignItems: 'center',
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#888',
-    marginBottom: 20,
-    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#6366F1',
+    marginBottom: 30,
+    letterSpacing: 2,
   },
-  input: {
-    position: 'absolute', // On cache l'input réel tout en gardant le focus
+  hiddenInput: {
+    position: 'absolute',
     opacity: 0,
     width: '100%',
     height: 60,
   },
   pinIndicatorContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 25,
     width: '100%',
-    paddingHorizontal: 20,
   },
   pinDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 50,
+    height: 60,
+    borderRadius: 12,
     borderWidth: 2,
+    borderColor: '#1E293B',
+    backgroundColor: '#111827',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   pinDotFilled: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#A5B4FC',
+    borderColor: '#A5B4FC',
   },
   pinDotEmpty: {
-    backgroundColor: 'transparent',
-    borderColor: '#DDD',
+    backgroundColor: '#111827',
   },
   footer: {
-    marginTop: 60,
+    marginTop: 80,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  footerSubtext: {
     fontSize: 12,
-    color: '#AAA',
+    color: '#64748B',
+    textAlign: 'center',
   },
 });

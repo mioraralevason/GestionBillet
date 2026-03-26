@@ -1,25 +1,38 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, Keyboard, Alert, useColorScheme } from 'react-native';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, Keyboard, Alert, useColorScheme, ScrollView } from 'react-native';
+import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
 import { TicketService, Ticket } from '../../services/TicketService';
+import { EventService } from '../../services/EventService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../constants/theme';
 import { TicketCard } from '../../components/TicketCard';
+import { StatusBar } from 'expo-status-bar';
 
 export default function TicketList() {
   const { eventId } = useLocalSearchParams();
   const router = useRouter();
   const id = parseInt(eventId as string);
-  
+
   const colorScheme = useColorScheme() || 'light';
-  const theme = Colors[colorScheme];
+  const theme = {
+    ...Colors[colorScheme],
+    header: '#000000',
+    background: '#000000',
+    card: '#111827',
+    border: '#1E293B',
+    text: '#FFFFFF',
+    icon: '#94A3B8',
+    tint: '#6366F1'
+  };
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketTypes, setTicketTypes] = useState<any[]>([]);
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  
+
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -27,6 +40,10 @@ export default function TicketList() {
   const fetchTickets = useCallback(() => {
     const list = TicketService.getTicketsByEvent(id);
     setTickets(list);
+    
+    // Fetch ticket types for filter
+    const types = EventService.getTicketTypes(id);
+    setTicketTypes(types);
   }, [id]);
 
   useFocusEffect(
@@ -139,10 +156,15 @@ export default function TicketList() {
     return j === q.length;
   };
 
-  const filteredTickets = tickets.filter(t => 
-    fuzzyMatch(t.ticket_number, search) || 
-    (t.buyer_name && t.buyer_name.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredTickets = tickets.filter(t => {
+    // Filter by type
+    if (selectedTypeId !== null && t.ticket_type_id !== selectedTypeId) {
+      return false;
+    }
+    // Filter by search
+    return fuzzyMatch(t.ticket_number, search) ||
+      (t.buyer_name && t.buyer_name.toLowerCase().includes(search.toLowerCase()));
+  });
 
   const getSuggestions = () => {
     if (search.length === 0) return [];
@@ -190,6 +212,16 @@ export default function TicketList() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar style="light" />
+      <Stack.Screen 
+        options={{ 
+          headerShown: true,
+          headerStyle: { backgroundColor: '#000000' },
+          headerTintColor: '#FFFFFF',
+          headerTitleStyle: { fontWeight: '900' },
+          headerTitle: 'Liste des Billets'
+        }} 
+      />
       {selectionMode ? (
         <View style={[styles.selectionHeader, { backgroundColor: theme.header, borderBottomColor: theme.border }]}>
           <TouchableOpacity onPress={cancelSelection} style={styles.headerIconBtn}>
@@ -262,7 +294,50 @@ export default function TicketList() {
           ))}
         </View>
       )}
-      
+
+      {/* Ticket Type Filter */}
+      {!selectionMode && ticketTypes.length > 0 && (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterScroll}
+          contentContainerStyle={styles.filterContainer}
+        >
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              selectedTypeId === null && { backgroundColor: theme.tint }
+            ]}
+            onPress={() => setSelectedTypeId(null)}
+          >
+            <Text style={[
+              styles.filterChipText,
+              selectedTypeId === null && { color: '#000', fontWeight: 'bold' }
+            ]}>
+              Tous
+            </Text>
+          </TouchableOpacity>
+          
+          {ticketTypes.map(type => (
+            <TouchableOpacity
+              key={type.id}
+              style={[
+                styles.filterChip,
+                selectedTypeId === type.id && { backgroundColor: theme.tint }
+              ]}
+              onPress={() => setSelectedTypeId(type.id)}
+            >
+              <Text style={[
+                styles.filterChipText,
+                selectedTypeId === type.id && { color: '#000', fontWeight: 'bold' }
+              ]}>
+                {type.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
       <FlatList
         data={filteredTickets}
         keyExtractor={(item) => item.id!.toString()}
@@ -373,5 +448,20 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 18,
     fontWeight: 'bold'
+  },
+  filterScroll: { maxHeight: 50 },
+  filterContainer: { flexDirection: 'row', paddingHorizontal: 15, gap: 10 },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  filterChipText: {
+    color: '#94A3B8',
+    fontSize: 14,
+    fontWeight: '600'
   }
 });

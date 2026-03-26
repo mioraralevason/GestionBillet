@@ -35,10 +35,9 @@ export default function EventDetails() {
 
   const [event, setEvent] = useState<Event | null>(null);
   const [stats, setStats] = useState<any>({ total: 0, available: 0, sold: 0, validated: 0, total_collected: 0, total_pending: 0, total_potential_revenue: 0 });
+  const [ticketTypes, setTicketTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<string | null>(null);
-  const [ticketCount, setTicketCount] = useState('');
-  const [ticketPrice, setTicketPrice] = useState('');
   const [exporting, setExporting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewSide, setPreviewSide] = useState<'recto' | 'verso'>('recto');
@@ -56,16 +55,36 @@ export default function EventDetails() {
   /**
    * Fetches event data and statistics from services.
    */
-  const fetchData = useCallback(async () => {
+  const fetchData = async () => {
     const userRole = await AsyncStorage.getItem('userRole');
     setRole(userRole);
-    
+
     const ev = EventService.getEvents().find(e => e.id === eventId);
     if (ev) {
       setEvent(ev);
       const s = TicketService.getEventStats(eventId);
       setStats(s);
-      
+      const types = EventService.getTicketTypes(eventId);
+      const allTickets = TicketService.getTicketsByEvent(eventId);
+
+      // Calculate stats per ticket type
+      const typesWithStats = types.map(type => {
+        // Filter by ticket_type_id OR by ticket_type_name (fallback for old tickets)
+        const typeTickets = allTickets.filter(t => {
+          return t.ticket_type_id === type.id || t.ticket_type_name === type.name;
+        });
+        const soldTickets = typeTickets.filter(t => t.status_id === TicketService.STATUS_VENDU || t.status_id === TicketService.STATUS_VALIDE);
+        return {
+          ...type,
+          total: typeTickets.length,
+          sold: soldTickets.length,
+          validated: typeTickets.filter(t => t.status_id === TicketService.STATUS_VALIDE).length,
+          revenue: soldTickets.reduce((sum, t) => sum + (t.total_paid || 0), 0)
+        };
+      });
+
+      setTicketTypes(typesWithStats);
+
       // Load image adjustments
       setImgScale(ev.img_scale || 1.0);
       setImgRotate(ev.img_rotate || 0);
@@ -73,34 +92,13 @@ export default function EventDetails() {
       setImgY(ev.img_y || 0);
     }
     setLoading(false);
-  }, [eventId]);
+  };
 
   useFocusEffect(
     useCallback(() => {
       fetchData();
-    }, [fetchData])
+    }, [])
   );
-
-  /**
-   * Handles ticket generation for the current event.
-   */
-  const handleGenerate = () => {
-    const count = parseInt(ticketCount);
-    const price = parseFloat(ticketPrice);
-
-    if (isNaN(count) || count <= 0) {
-      Alert.alert('Erreur', 'Nombre de billets invalide.');
-      return;
-    }
-
-    if (TicketService.generateTickets(eventId, count, isNaN(price) ? 0 : price)) {
-      Alert.alert('Succès', `${count} billets générés.`);
-      setTicketCount('');
-      fetchData();
-    } else {
-      Alert.alert('Erreur', 'Échec de la génération des billets.');
-    }
-  };
 
   /**
    * Triggers PDF generation and sharing.
@@ -224,38 +222,44 @@ export default function EventDetails() {
         </View>
       )}
 
-      {role === 'admin' && (
+      {ticketTypes.length > 0 && (
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>Générer des billets</Text>
-          <View style={styles.row}>
-            <View style={{ flex: 1, marginRight: 10 }}>
-              <Text style={[styles.label, { color: theme.icon }]}>Quantité</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#F3F4F6', color: theme.text }]}
-                placeholder="Ex: 50"
-                placeholderTextColor={theme.icon}
-                keyboardType="numeric"
-                value={ticketCount}
-                onChangeText={setTicketCount}
-              />
+          <Text style={[styles.cardTitle, { color: theme.text }]}>Types de Billets</Text>
+          {ticketTypes.map((type, index) => (
+            <View key={type.id} style={[styles.ticketTypeRow, index < ticketTypes.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: 10, marginBottom: 10 }]}>
+              <View style={styles.ticketTypeInfo}>
+                <Text style={[styles.ticketTypeName, { color: themeColor }]}>{type.name}</Text>
+                <Text style={[styles.ticketTypePrice, { color: theme.icon }]}>{type.price.toLocaleString()} Ar</Text>
+              </View>
+              <View style={styles.ticketTypeStats}>
+                <View style={styles.ticketTypeStatItem}>
+                  <Text style={[styles.ticketTypeStatValue, { color: theme.text }]}>{type.total}</Text>
+                  <Text style={[styles.ticketTypeStatLabel, { color: theme.icon }]}>Total</Text>
+                </View>
+                <View style={[styles.ticketTypeStatItem, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: theme.border }]}>
+                  <Text style={[styles.ticketTypeStatValue, { color: theme.text }]}>{type.sold}</Text>
+                  <Text style={[styles.ticketTypeStatLabel, { color: theme.icon }]}>Vendus</Text>
+                </View>
+                <View style={styles.ticketTypeStatItem}>
+                  <Text style={[styles.ticketTypeStatValue, { color: theme.success }]}>{type.validated}</Text>
+                  <Text style={[styles.ticketTypeStatLabel, { color: theme.icon }]}>Vérifiés</Text>
+                </View>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.label, { color: theme.icon }]}>Prix (Ar)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#F3F4F6', color: theme.text }]}
-                placeholder="Ex: 20000"
-                placeholderTextColor={theme.icon}
-                keyboardType="numeric"
-                value={ticketPrice}
-                onChangeText={setTicketPrice}
-              />
-            </View>
-          </View>
-          <TouchableOpacity style={[styles.button, { backgroundColor: themeColor }]} onPress={handleGenerate}>
-            <MaterialCommunityIcons name="ticket-plus" size={20} color="#000" />
-            <Text style={[styles.buttonText, { color: '#000' }]}>Créer les billets</Text>
-          </TouchableOpacity>
+          ))}
         </View>
+      )}
+
+      {role === 'admin' && (
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: themeColor }]}
+          onPress={() => router.push(`/event/${eventId}/generate`)}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <MaterialCommunityIcons name="ticket-outline" size={24} color="#000" />
+            <Text style={[styles.buttonText, { color: '#000' }]}>Générer des billets</Text>
+          </View>
+        </TouchableOpacity>
       )}
 
       <TouchableOpacity 
@@ -331,38 +335,52 @@ export default function EventDetails() {
 
             <View style={styles.ticketContainer}>
               {/* Face RECTO */}
-              <View 
+              <View
                 style={[
-                  styles.ticketPreview, 
-                  styles.ticketRecto, 
-                  { backgroundColor: '#FFF', borderLeftColor: themeColor },
+                  styles.ticketPreview,
+                  styles.ticketRecto,
+                  { backgroundColor: '#FFF' },
                   previewSide !== 'recto' && { position: 'absolute', opacity: 0, zIndex: -1 }
                 ]}
                 pointerEvents={previewSide === 'recto' ? 'auto' : 'none'}
               >
-                <Text style={[styles.previewEventName, { color: themeColor }]}>{event?.name}</Text>
-                <Text style={[styles.previewEventDate, { color: '#666' }]}>{event?.event_date}</Text>
-                <View style={styles.previewNumBox}>
-                  <Text style={styles.previewNumText}>E{event?.id}-T0001</Text>
+                {/* Section colorée avec courbe */}
+                <View style={[styles.rectoTopSection, { backgroundColor: themeColor }]}>
+                  {event?.slogan && (
+                    <Text style={styles.rectoSlogan} numberOfLines={1}>{event.slogan}</Text>
+                  )}
+                  <View style={styles.rectoTopContent}>
+                    <Text style={styles.rectoTitle}>BILLET</Text>
+                    <MaterialCommunityIcons name="ticket-outline" size={45} color="#000" />
+                  </View>
                 </View>
-                <MaterialCommunityIcons name="qrcode" size={140} color="#333" />
-                <Text style={[styles.previewSlogan, { color: themeColor }]}>{event?.slogan}</Text>
+                {/* Section blanche avec courbe vers le haut */}
+                <View style={[styles.rectoBottomSection, { backgroundColor: '#FFF' }]}>
+                  <View style={styles.rectoEventInfo}>
+                    <Text style={[styles.previewEventName, { color: themeColor }]} numberOfLines={2}>{event?.name}</Text>
+                    <Text style={[styles.previewEventDate, { color: '#666' }]}>{event?.event_date}</Text>
+                  </View>
+                  <View style={styles.previewNumBox}>
+                    <Text style={styles.previewNumText}>E{event?.id}-T0001</Text>
+                  </View>
+                  <MaterialCommunityIcons name="qrcode" size={110} color="#333" />
+                </View>
               </View>
 
               {/* Face VERSO */}
-              <View 
+              <View
                 style={[
-                  styles.ticketPreview, 
-                  styles.ticketVerso, 
-                  { backgroundColor: '#F9F9F9', borderRightColor: themeColor },
+                  styles.ticketPreview,
+                  styles.ticketVerso,
+                  { backgroundColor: '#FFF' },
                   previewSide !== 'verso' && { position: 'absolute', opacity: 0, zIndex: -1 }
                 ]}
                 pointerEvents={previewSide === 'verso' ? 'auto' : 'none'}
               >
                 {/* Image de fond avec transformations */}
                 {event?.image && (
-                  <Image 
-                    source={{ uri: event.image }} 
+                  <Image
+                    source={{ uri: event.image }}
                     style={[
                       StyleSheet.absoluteFill,
                       {
@@ -377,23 +395,35 @@ export default function EventDetails() {
                     contentFit="cover"
                   />
                 )}
-                
+
                 {/* Calque de contraste atténué si mode clair */}
                 {event?.image && (
                   <View style={[StyleSheet.absoluteFill, { backgroundColor: isClearMode ? 'transparent' : 'rgba(255,255,255,0.7)' }]} />
                 )}
-                
-                {/* Contenu - Masqué si mode clair et image présente */}
-                {(!isClearMode || !event?.image) && (
-                  <View style={styles.versoContent}>
-                    <Text style={styles.previewDescription}>
-                      {event?.description || "Merci de votre participation ! Ce billet est unique et personnel."}
+
+                {/* Logo au milieu */}
+                <View style={styles.versoLogoContainer}>
+                  <Image
+                    source={require('../../assets/logo_iBillet.png')}
+                    style={styles.versoLogo}
+                    contentFit="contain"
+                  />
+                </View>
+
+                {/* Description si présente */}
+                {event?.description && (
+                  <View style={styles.versoDescriptionContainer}>
+                    <Text style={styles.versoDescription}>
+                      {event.description}
                     </Text>
-                    <View style={styles.versoFooter}>
-                      <Text style={styles.versoFooterText}>Billet : E{event?.id}-T0001 | Prix : {ticketPrice || '0'} Ar</Text>
-                    </View>
                   </View>
                 )}
+
+                {/* Footer avec copyright et téléphone */}
+                <View style={styles.versoFooter}>
+                  <Text style={styles.versoFooterText}>© 2026 iBillet - Tous droits réservés</Text>
+                  <Text style={styles.versoFooterText}>📞 033 76 913 14</Text>
+                </View>
               </View>
             </View>
 
@@ -472,31 +502,48 @@ const styles = StyleSheet.create({
   financeItem: { flex: 1 },
   financeLabel: { fontSize: 12, textTransform: 'uppercase', marginBottom: 5 },
   financeValue: { fontSize: 18, fontWeight: 'bold' },
+  ticketTypeRow: { paddingVertical: 10 },
+  ticketTypeInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  ticketTypeName: { fontSize: 16, fontWeight: 'bold' },
+  ticketTypePrice: { fontSize: 14, fontWeight: '600' },
+  ticketTypeStats: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 8, paddingVertical: 8 },
+  ticketTypeStatItem: { flex: 1, alignItems: 'center' },
+  ticketTypeStatValue: { fontSize: 16, fontWeight: 'bold' },
+  ticketTypeStatLabel: { fontSize: 10, marginTop: 2 },
   row: { flexDirection: 'row', marginBottom: 15 },
   label: { fontSize: 13, marginBottom: 5 },
   input: { borderRadius: 8, padding: 12, fontSize: 16 },
   button: { flexDirection: 'row', borderRadius: 10, padding: 15, alignItems: 'center', justifyContent: 'center', gap: 10 },
   buttonText: { fontSize: 16, fontWeight: 'bold' },
   viewTickets: { marginTop: 0, flexDirection: 'column' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
-  previewContent: { borderRadius: 20, padding: 20, maxHeight: '90%' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 20 },
+  previewContent: { borderRadius: 24, padding: 20, maxHeight: '90%', backgroundColor: '#111827', borderWidth: 1, borderColor: '#1E293B' },
   previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  previewTitle: { fontSize: 20, fontWeight: 'bold' },
-  toggleContainer: { flexDirection: 'row', borderRadius: 10, padding: 4, marginBottom: 20 },
+  previewTitle: { fontSize: 20, fontWeight: '900', color: '#FFFFFF' },
+  toggleContainer: { flexDirection: 'row', borderRadius: 12, padding: 4, marginBottom: 20, backgroundColor: '#1E293B' },
   toggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
   toggleText: { fontWeight: 'bold' },
   ticketContainer: { alignItems: 'center', marginBottom: 20 },
-  ticketPreview: { width: 250, height: 350, borderRadius: 10, padding: 15, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 5, alignItems: 'center', justifyContent: 'space-between', overflow: 'hidden' },
-  ticketRecto: { borderLeftWidth: 10 },
-  ticketVerso: { borderRightWidth: 10 },
-  previewEventName: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', textTransform: 'uppercase' },
-  previewEventDate: { fontSize: 14 },
+  ticketPreview: { width: 250, height: 350, borderRadius: 16, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 5, overflow: 'hidden' },
+  ticketRecto: {},
+  ticketVerso: {},
+  rectoTopSection: { width: '100%', height: '52%', justifyContent: 'flex-start', alignItems: 'center', paddingTop: 15 },
+  rectoSlogan: { fontSize: 11, fontStyle: 'italic', color: '#000', textAlign: 'center', marginBottom: 8, paddingHorizontal: 10, opacity: 0.8 },
+  rectoTopContent: { alignItems: 'center', zIndex: 10 },
+  rectoTitle: { fontSize: 18, fontWeight: 'bold', color: '#000', marginBottom: 5, letterSpacing: 2 },
+  rectoBottomSection: { flex: 1, width: '100%', paddingHorizontal: 20, paddingVertical: 15, alignItems: 'center', justifyContent: 'space-around', borderTopLeftRadius: 80, borderTopRightRadius: 80, marginTop: -60 },
+  rectoEventInfo: { alignItems: 'center', marginTop: 10 },
+  versoLogoContainer: { flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
+  versoLogo: { width: 120, height: 120 },
+  versoDescriptionContainer: { paddingHorizontal: 20, paddingBottom: 60 },
+  versoDescription: { fontSize: 12, color: '#333', textAlign: 'center', fontStyle: 'italic', lineHeight: 18 },
+  previewEventName: { fontSize: 15, fontWeight: 'bold', textAlign: 'center', textTransform: 'uppercase' },
+  previewEventDate: { fontSize: 13, marginTop: 4, color: '#666' },
+  sloganContainer: { alignItems: 'center', paddingHorizontal: 10 },
   previewNumBox: { backgroundColor: '#EEE', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15 },
   previewNumText: { fontSize: 12, fontWeight: 'bold', color: '#333' },
   previewSlogan: { fontSize: 13, fontStyle: 'italic', textAlign: 'center' },
-  versoContent: { flex: 1, width: '100%', padding: 20, justifyContent: 'space-between', zIndex: 10 },
-  previewDescription: { fontSize: 13, color: '#333', textAlign: 'left', lineHeight: 20, fontWeight: '500' },
-  versoFooter: { borderTopWidth: 1, borderTopColor: '#DDD', paddingTop: 10, marginTop: 10 },
+  versoFooter: { position: 'absolute', bottom: 15, left: 0, right: 0, alignItems: 'center', gap: 4 },
   versoFooterText: { fontSize: 10, color: '#999', textAlign: 'center' },
   previewHint: { fontSize: 12, textAlign: 'center', fontStyle: 'italic' },
   adjustmentControls: { marginTop: 10, width: '100%' },

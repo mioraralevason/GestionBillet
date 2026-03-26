@@ -64,6 +64,13 @@ export const initDB = () => {
       db.execSync(`ALTER TABLE events ADD COLUMN img_x REAL DEFAULT 0.0;`);
       db.execSync(`ALTER TABLE events ADD COLUMN img_y REAL DEFAULT 0.0;`);
     }
+    // New Migration: Add 'ticket_type_id' to 'tickets' table if it doesn't exist
+    const ticketTableInfo: any[] = db.getAllSync(`PRAGMA table_info(tickets)`);
+    const hasTicketTypeId = ticketTableInfo.some((column: any) => column.name === 'ticket_type_id');
+    if (ticketTableInfo.length > 0 && !hasTicketTypeId) {
+      console.log("Adding 'ticket_type_id' column to 'tickets' table...");
+      db.execSync(`ALTER TABLE tickets ADD COLUMN ticket_type_id INTEGER;`);
+    }
   } catch (e) {
     console.error("Migration error", e);
   }
@@ -96,6 +103,18 @@ export const initDB = () => {
   );
 
   db.execSync(
+    `CREATE TABLE IF NOT EXISTS ticket_types (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      price INTEGER NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (event_id) REFERENCES events (id)
+    );`
+  );
+
+  db.execSync(
     `CREATE TABLE IF NOT EXISTS status (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -120,6 +139,7 @@ export const initDB = () => {
     `CREATE TABLE IF NOT EXISTS tickets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       event_id INTEGER NOT NULL,
+      ticket_type_id INTEGER,
       ticket_number TEXT UNIQUE,
       qr_code TEXT UNIQUE,
       price INTEGER NOT NULL,
@@ -128,6 +148,7 @@ export const initDB = () => {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (event_id) REFERENCES events (id),
+      FOREIGN KEY (ticket_type_id) REFERENCES ticket_types (id),
       FOREIGN KEY (status_id) REFERENCES status (id),
       FOREIGN KEY (buyer_id) REFERENCES buyers (id)
     );`

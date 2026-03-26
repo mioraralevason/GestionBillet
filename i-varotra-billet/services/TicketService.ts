@@ -7,6 +7,8 @@ import { BuyerService } from './BuyerService';
 export interface Ticket {
   id?: number;
   event_id: number;
+  ticket_type_id?: number;
+  ticket_type_name?: string;
   ticket_number: string;
   qr_code: string;
   price: number;
@@ -33,16 +35,17 @@ export const TicketService = {
    * @param {number} eventId - The ID of the event.
    * @param {number} count - How many tickets to create.
    * @param {number} price - Base price for each ticket.
+   * @param {number} ticketTypeId - (Optional) The ID of the ticket type.
    * @returns {boolean} True if generation was successful.
    */
-  generateTickets: (eventId: number, count: number, price: number): boolean => {
+  generateTickets: (eventId: number, count: number, price: number, ticketTypeId?: number): boolean => {
     try {
       const stats: any = db.getFirstSync(`SELECT COUNT(*) as total FROM tickets WHERE event_id = ?`, eventId);
       const startCount = stats ? stats.total + 1 : 1;
       for (let i = 0; i < count; i++) {
         const ticketNum = `E${eventId}-T${(startCount + i).toString().padStart(4, '0')}`;
-        db.runSync(`INSERT INTO tickets (event_id, ticket_number, qr_code, price, status_id) VALUES (?, ?, ?, ?, ?)`,
-          eventId, ticketNum, ticketNum, price, TicketService.STATUS_DISPONIBLE);
+        db.runSync(`INSERT INTO tickets (event_id, ticket_number, qr_code, price, status_id, ticket_type_id) VALUES (?, ?, ?, ?, ?, ?)`,
+          eventId, ticketNum, ticketNum, price, TicketService.STATUS_DISPONIBLE, ticketTypeId || null);
       }
       return true;
     } catch (error) { return false; }
@@ -56,16 +59,37 @@ export const TicketService = {
    */
   getTicketsByEvent: (eventId: number): Ticket[] => {
     try {
-      return db.getAllSync(
-        `SELECT t.*, s.name as status_name, b.name as buyer_name, b.phone as buyer_phone,
-         (SELECT SUM(amount) FROM payments WHERE ticket_id = t.id) as total_paid
+      // First check if tickets exist
+      const simpleTickets = db.getAllSync(
+        `SELECT id, event_id, ticket_number, qr_code, price, status_id, buyer_id, ticket_type_id
+         FROM tickets
+         WHERE event_id = ? ORDER BY ticket_number ASC`,
+        eventId
+      );
+      
+      if (!simpleTickets || simpleTickets.length === 0) {
+        return [];
+      }
+      
+      // Now get full details with JOINs
+      const tickets = db.getAllSync(
+        `SELECT t.id, t.event_id, t.ticket_number, t.qr_code, t.price, t.status_id, t.buyer_id, t.ticket_type_id,
+         s.name as status_name, b.name as buyer_name, b.phone as buyer_phone,
+         tt.name as ticket_type_name,
+         (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE ticket_id = t.id) as total_paid
          FROM tickets t
          LEFT JOIN status s ON t.status_id = s.id
          LEFT JOIN buyers b ON t.buyer_id = b.id
+         LEFT JOIN ticket_types tt ON t.ticket_type_id = tt.id
          WHERE t.event_id = ? ORDER BY t.ticket_number ASC`,
         eventId
       );
-    } catch (error) { return []; }
+      
+      return tickets || simpleTickets;
+    } catch (error) { 
+      console.error('getTicketsByEvent error:', error);
+      return []; 
+    }
   },
 
   /**
@@ -77,10 +101,12 @@ export const TicketService = {
     try {
       return db.getFirstSync(
         `SELECT t.*, s.name as status_name, b.name as buyer_name, b.phone as buyer_phone,
+         tt.name as ticket_type_name,
          (SELECT SUM(amount) FROM payments WHERE ticket_id = t.id) as total_paid
          FROM tickets t
          LEFT JOIN status s ON t.status_id = s.id
          LEFT JOIN buyers b ON t.buyer_id = b.id
+         LEFT JOIN ticket_types tt ON t.ticket_type_id = tt.id
          WHERE t.id = ?`,
         id
       );
@@ -202,11 +228,12 @@ export const TicketService = {
   getRecentActivities: (): any[] => {
     try {
       return db.getAllSync(
-        `SELECT t.*, s.name as status_name, b.name as buyer_name, e.name as event_name
+        `SELECT t.*, s.name as status_name, b.name as buyer_name, e.name as event_name, tt.name as ticket_type_name
          FROM tickets t
          LEFT JOIN status s ON t.status_id = s.id
          LEFT JOIN buyers b ON t.buyer_id = b.id
          LEFT JOIN events e ON t.event_id = e.id
+         LEFT JOIN ticket_types tt ON t.ticket_type_id = tt.id
          WHERE t.status_id IN (${TicketService.STATUS_VENDU}, ${TicketService.STATUS_VALIDE})
          ORDER BY t.updated_at DESC LIMIT 10`
       );
@@ -225,7 +252,7 @@ export const TicketService = {
           SUM(CASE WHEN status_id = ${TicketService.STATUS_DISPONIBLE} THEN 1 ELSE 0 END) as available,
           SUM(CASE WHEN status_id = ${TicketService.STATUS_VENDU} THEN 1 ELSE 0 END) as sold,
           SUM(CASE WHEN status_id = ${TicketService.STATUS_VALIDE} THEN 1 ELSE 0 END) as validated,
-          SUM(price) as total_potential_revenue
+          SUM(CASE WHEN status_id IN (${TicketService.STATUS_VENDU}, ${TicketService.STATUS_VALIDE}) THEN price ELSE 0 END) as total_potential_revenue
          FROM tickets WHERE event_id = ?`,
         eventId
       );
@@ -234,7 +261,7 @@ export const TicketService = {
         `SELECT SUM(p.amount) as total_collected
          FROM payments p
          JOIN tickets t ON p.ticket_id = t.id
-         WHERE t.event_id = ?`,
+         WHERE t.event_id = ? AND t.status_id IN (${TicketService.STATUS_VENDU}, ${TicketService.STATUS_VALIDE})`,
         eventId
       );
 
@@ -243,8 +270,9 @@ export const TicketService = {
         total_collected: payments?.total_collected || 0,
         total_pending: (counts?.total_potential_revenue || 0) - (payments?.total_collected || 0)
       };
-    } catch (error) { 
-      return { total: 0, available: 0, sold: 0, validated: 0, total_potential_revenue: 0, total_collected: 0, total_pending: 0 }; 
+    } catch (error) {
+      console.error('getEventStats error:', error);
+      return { total: 0, available: 0, sold: 0, validated: 0, total_potential_revenue: 0, total_collected: 0, total_pending: 0 };
     }
   }
 };

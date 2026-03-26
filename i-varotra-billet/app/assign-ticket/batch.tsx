@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Modal } from 'react-native';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Modal, SafeAreaView } from 'react-native';
+import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
 import { TicketService, Ticket } from '../../services/TicketService';
 import { BuyerService, Buyer } from '../../services/BuyerService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 
 export default function BatchAssign() {
   const { ids, eventId, mode } = useLocalSearchParams();
@@ -97,79 +98,97 @@ export default function BatchAssign() {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <Text style={styles.title}>
-            {mode === 'assign' ? 'Assignation Groupée' : 'Paiement Groupé'}
-          </Text>
-          <Text style={styles.subtitle}>{ticketIds.length} Billets sélectionnés</Text>
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Acheteur pour tous les billets</Text>
-          <TouchableOpacity style={styles.dropdown} onPress={() => setShowBuyerList(!showBuyerList)}>
-            <Text style={{ color: buyerName ? '#333' : '#999', fontSize: 16 }}>
-              {buyerName || "Rechercher ou ajouter..."}
-            </Text>
-            <MaterialCommunityIcons name={showBuyerList ? "chevron-up" : "chevron-down"} size={20} />
-          </TouchableOpacity>
-
-          {showBuyerList && (
-            <View style={styles.buyerList}>
-              <View style={styles.searchDropdownWrapper}>
-                <MaterialCommunityIcons name="magnify" size={18} color="#999" />
-                <TextInput
-                  style={styles.searchDropdownInput}
-                  placeholder="Rechercher..."
-                  value={buyerSearch}
-                  onChangeText={setBuyerSearch}
-                  autoFocus
-                />
-              </View>
-              
-              <TouchableOpacity 
-                style={styles.addNewOption} 
-                onPress={() => {
-                  setNewName(buyerSearch);
-                  setShowAddModal(true);
-                  setShowBuyerList(false);
-                }}
-              >
-                <MaterialCommunityIcons name="account-plus" size={24} color="#007AFF" />
-                <Text style={styles.addNewText}>Nouvel acheteur</Text>
-              </TouchableOpacity>
-
-              {filteredBuyers.map(b => (
-                <TouchableOpacity key={b.id} style={styles.buyerOption} onPress={() => selectBuyer(b)}>
-                  <Text style={styles.buyerNameText}>{b.name}</Text>
-                  {b.phone && <Text style={{ fontSize: 12, color: '#999' }}>{b.phone}</Text>}
-                </TouchableOpacity>
-              ))}
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="light" />
+      <Stack.Screen 
+        options={{ 
+          headerShown: true,
+          headerStyle: { backgroundColor: '#000000' },
+          headerTintColor: '#FFFFFF',
+          headerTitleStyle: { fontWeight: '900' },
+          headerTitle: mode === 'assign' ? 'Assignation Groupée' : 'Paiement Groupé'
+        }} 
+      />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <View style={styles.iconBox}>
+              <MaterialCommunityIcons 
+                name={mode === 'assign' ? "account-multiple-plus" : "cash-register"} 
+                size={40} 
+                color="#6366F1" 
+              />
             </View>
-          )}
-        </View>
-
-        {buyerName ? (
-          <View style={styles.selectedBuyerCard}>
-            <MaterialCommunityIcons name="account-check" size={24} color="#34C759" />
-            <View style={{ marginLeft: 10, flex: 1 }}>
-              <Text style={{ fontWeight: 'bold' }}>{buyerName}</Text>
-              {buyerPhone && <Text style={{ fontSize: 12, color: '#666' }}>{buyerPhone}</Text>}
-            </View>
-            <TouchableOpacity onPress={() => { setBuyerName(''); setBuyerPhone(''); }}>
-              <MaterialCommunityIcons name="close-circle" size={20} color="#FF3B30" />
-            </TouchableOpacity>
+            <Text style={styles.subtitle}>{ticketIds.length} Billets sélectionnés</Text>
           </View>
-        ) : null}
 
-        {mode === 'pay' && (
-          <View style={styles.ticketsSection}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <Text style={styles.label}>Détails des paiements</Text>
-              <TouchableOpacity onPress={setAllToPaid}>
-                <Text style={{ color: '#007AFF', fontWeight: 'bold' }}>Tout payer totalement</Text>
+          <View style={styles.section}>
+            <Text style={styles.label}>ACHETEUR POUR TOUS</Text>
+            <TouchableOpacity style={styles.dropdown} onPress={() => setShowBuyerList(!showBuyerList)}>
+              <MaterialCommunityIcons name="account" size={20} color="#6366F1" style={{ marginRight: 10 }} />
+              <Text style={{ color: buyerName ? '#FFFFFF' : '#64748B', fontSize: 16, flex: 1 }}>
+                {buyerName || "Rechercher ou ajouter..."}
+              </Text>
+              <MaterialCommunityIcons name={showBuyerList ? "chevron-up" : "chevron-down"} size={20} color="#94A3B8" />
+            </TouchableOpacity>
+
+            {showBuyerList && (
+              <View style={styles.buyerList}>
+                <View style={styles.searchDropdownWrapper}>
+                  <MaterialCommunityIcons name="magnify" size={18} color="#94A3B8" />
+                  <TextInput
+                    style={styles.searchDropdownInput}
+                    placeholder="Rechercher..."
+                    placeholderTextColor="#64748B"
+                    value={buyerSearch}
+                    onChangeText={setBuyerSearch}
+                    autoFocus
+                  />
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.addNewOption} 
+                  onPress={() => {
+                    setNewName(buyerSearch);
+                    setShowAddModal(true);
+                    setShowBuyerList(false);
+                  }}
+                >
+                  <MaterialCommunityIcons name="account-plus" size={24} color="#6366F1" />
+                  <Text style={styles.addNewText}>Nouvel acheteur</Text>
+                </TouchableOpacity>
+
+                {filteredBuyers.map(b => (
+                  <TouchableOpacity key={b.id} style={styles.buyerOption} onPress={() => selectBuyer(b)}>
+                    <Text style={styles.buyerNameText}>{b.name}</Text>
+                    {b.phone && <Text style={{ fontSize: 12, color: '#94A3B8' }}>{b.phone}</Text>}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {buyerName ? (
+            <View style={styles.selectedBuyerCard}>
+              <MaterialCommunityIcons name="account-check" size={24} color="#10B981" />
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={{ fontWeight: 'bold', color: '#FFFFFF' }}>{buyerName}</Text>
+                {buyerPhone && <Text style={{ fontSize: 12, color: '#94A3B8' }}>{buyerPhone}</Text>}
+              </View>
+              <TouchableOpacity onPress={() => { setBuyerName(''); setBuyerPhone(''); }}>
+                <MaterialCommunityIcons name="close-circle" size={20} color="#FF2E63" />
               </TouchableOpacity>
+            </View>
+          ) : null}
+
+          <View style={styles.ticketsSection}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+              <Text style={styles.label}>DÉTAILS DES BILLETS</Text>
+              {mode === 'pay' && (
+                <TouchableOpacity onPress={setAllToPaid}>
+                  <Text style={{ color: '#6366F1', fontWeight: 'bold', fontSize: 12 }}>TOUT PAYER</Text>
+                </TouchableOpacity>
+              )}
             </View>
             
             {selectedTickets.map(t => (
@@ -178,104 +197,185 @@ export default function BatchAssign() {
                   <Text style={styles.ticketNum}>{t.ticket_number}</Text>
                   <Text style={styles.ticketPrice}>{t.price} Ar</Text>
                 </View>
-                <TextInput
-                  style={styles.amountInput}
-                  keyboardType="numeric"
-                  placeholder="Montant"
-                  value={amounts[t.id!] || ''}
-                  onChangeText={(val) => updateAmount(t.id!, val)}
-                />
+                {mode === 'pay' ? (
+                  <TextInput
+                    style={styles.amountInput}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor="#64748B"
+                    value={amounts[t.id!] || ''}
+                    onChangeText={(val) => updateAmount(t.id!, val)}
+                  />
+                ) : (
+                  <MaterialCommunityIcons name="check-circle" size={20} color="#6366F1" />
+                )}
               </View>
             ))}
           </View>
-        )}
 
-        <View style={styles.actions}>
-          <TouchableOpacity 
-            style={[styles.assignBtn, mode === 'pay' && { backgroundColor: '#34C759' }]} 
-            onPress={handleAction}
-          >
-            <MaterialCommunityIcons 
-              name={mode === 'assign' ? "account-check" : "cash-check"} 
-              size={24} 
-              color="#FFF" 
-            />
-            <Text style={styles.btnText}>
-              {mode === 'assign' ? "Confirmer l'assignation" : "Confirmer le paiement"}
-            </Text>
+          <View style={styles.actions}>
+            <TouchableOpacity 
+              style={[styles.assignBtn, mode === 'pay' ? { backgroundColor: '#10B981' } : { backgroundColor: '#A5B4FC' }]} 
+              onPress={handleAction}
+            >
+              <MaterialCommunityIcons 
+                name={mode === 'assign' ? "account-check" : "cash-check"} 
+                size={24} 
+                color={mode === 'pay' ? "#FFF" : "#000"} 
+              />
+              <Text style={[styles.btnText, mode === 'pay' ? { color: '#FFF' } : { color: '#000' }]}>
+                {mode === 'assign' ? "Confirmer l'assignation" : "Confirmer le paiement"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
+            <Text style={{ color: '#94A3B8', fontSize: 16, fontWeight: '600' }}>Annuler</Text>
           </TouchableOpacity>
-        </View>
 
-        <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
-          <Text style={{ color: '#FF3B30', fontSize: 16 }}>Annuler</Text>
-        </TouchableOpacity>
-
-        <Modal visible={showAddModal} transparent animationType="slide">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Nouvel Acheteur</Text>
-              <TextInput 
-                style={styles.input} 
-                placeholder="Nom complet" 
-                value={newName}
-                onChangeText={setNewName}
-              />
-              <TextInput 
-                style={[styles.input, { marginTop: 10 }]} 
-                placeholder="Téléphone" 
-                keyboardType="phone-pad"
-                value={newPhone}
-                onChangeText={setNewPhone}
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.btnCancel} onPress={() => setShowAddModal(false)}>
-                  <Text style={styles.btnTextCancel}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.btnAdd} onPress={handleQuickAddBuyer}>
-                  <Text style={styles.btnTextAdd}>Confirmer</Text>
-                </TouchableOpacity>
+          <Modal visible={showAddModal} transparent animationType="slide">
+            <View style={styles.modalOverlayDark}>
+              <View style={styles.modalContentDark}>
+                <Text style={styles.modalTitleDark}>Nouvel Acheteur</Text>
+                <TextInput 
+                  style={styles.darkInput} 
+                  placeholder="Nom complet" 
+                  placeholderTextColor="#64748B"
+                  value={newName}
+                  onChangeText={setNewName}
+                />
+                <TextInput 
+                  style={[styles.darkInput, { marginTop: 15 }]} 
+                  placeholder="Téléphone" 
+                  placeholderTextColor="#64748B"
+                  keyboardType="phone-pad"
+                  value={newPhone}
+                  onChangeText={setNewPhone}
+                />
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={styles.btnCancel} onPress={() => setShowAddModal(false)}>
+                    <Text style={styles.btnTextCancel}>Annuler</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.btnConfirm} onPress={handleQuickAddBuyer}>
+                    <Text style={styles.btnTextConfirm}>Ajouter</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </Modal>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF' },
+  container: { flex: 1, backgroundColor: '#000000' },
   scroll: { padding: 20 },
-  header: { marginBottom: 20, alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#007AFF' },
-  subtitle: { fontSize: 14, color: '#666', marginTop: 4 },
-  formGroup: { marginBottom: 20 },
-  label: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 },
-  input: { backgroundColor: '#F3F4F6', padding: 15, borderRadius: 10, fontSize: 16 },
-  dropdown: { backgroundColor: '#F3F4F6', padding: 15, borderRadius: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  buyerList: { backgroundColor: '#FFF', elevation: 3, borderRadius: 10, marginTop: 5, maxHeight: 300, borderWidth: 1, borderColor: '#EEE', overflow: 'scroll' },
-  searchDropdownWrapper: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F0F0F0', paddingHorizontal: 10, paddingVertical: 8 },
-  searchDropdownInput: { flex: 1, marginLeft: 8, fontSize: 14, height: 40 },
-  buyerOption: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  buyerNameText: { fontSize: 16, fontWeight: '500' },
-  addNewOption: { padding: 15, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  addNewText: { color: '#007AFF', fontWeight: 'bold', fontSize: 16 },
-  selectedBuyerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5E9', padding: 15, borderRadius: 10, marginBottom: 20 },
+  header: { marginBottom: 30, alignItems: 'center' },
+  iconBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: '#111827',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  subtitle: { fontSize: 16, color: '#94A3B8', fontWeight: '600' },
+  
+  section: { marginBottom: 25 },
+  label: { fontSize: 12, fontWeight: '800', color: '#6366F1', marginBottom: 12, letterSpacing: 2 },
+  
+  dropdown: { 
+    backgroundColor: '#111827', 
+    padding: 15, 
+    borderRadius: 12, 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1E293B'
+  },
+  buyerList: { 
+    backgroundColor: '#111827', 
+    borderRadius: 12, 
+    marginTop: 8, 
+    borderWidth: 1, 
+    borderColor: '#1E293B', 
+    elevation: 5, 
+    maxHeight: 250 
+  },
+  searchDropdownWrapper: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#1E293B', 
+    paddingHorizontal: 12, 
+    paddingVertical: 10 
+  },
+  searchDropdownInput: { flex: 1, marginLeft: 10, fontSize: 16, color: '#FFFFFF', height: 40 },
+  buyerOption: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#1E293B' },
+  buyerNameText: { fontSize: 16, fontWeight: '500', color: '#FFFFFF' },
+  addNewOption: { padding: 15, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#1E293B' },
+  addNewText: { color: '#6366F1', fontWeight: 'bold', fontSize: 16 },
+
+  selectedBuyerCard: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#10B9811A', 
+    padding: 15, 
+    borderRadius: 12, 
+    marginBottom: 25,
+    borderWidth: 1,
+    borderColor: '#10B981'
+  },
+
   ticketsSection: { marginBottom: 30 },
-  ticketItem: { flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#F9F9F9', borderRadius: 10, marginBottom: 8, borderWidth: 1, borderColor: '#EEE' },
-  ticketNum: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  ticketPrice: { fontSize: 13, color: '#666' },
-  amountInput: { backgroundColor: '#FFF', width: 100, padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#CCC', textAlign: 'right', fontSize: 16 },
+  ticketItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    padding: 15, 
+    backgroundColor: '#111827', 
+    borderRadius: 12, 
+    marginBottom: 10, 
+    borderWidth: 1, 
+    borderColor: '#1E293B' 
+  },
+  ticketNum: { fontSize: 16, fontWeight: '900', color: '#FFFFFF' },
+  ticketPrice: { fontSize: 13, color: '#94A3B8' },
+  amountInput: { 
+    backgroundColor: '#000000', 
+    width: 100, 
+    padding: 10, 
+    borderRadius: 8, 
+    borderWidth: 1, 
+    borderColor: '#1E293B', 
+    textAlign: 'right', 
+    fontSize: 16,
+    color: '#FFFFFF'
+  },
+
   actions: { gap: 15, marginTop: 10 },
-  assignBtn: { backgroundColor: '#007AFF', padding: 18, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-  cancelBtn: { marginTop: 20, padding: 15, alignItems: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#FFF', borderRadius: 15, padding: 20 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
-  btnCancel: { flex: 1, padding: 15, alignItems: 'center' },
-  btnTextCancel: { color: '#FF3B30', fontSize: 16 },
-  btnAdd: { flex: 2, backgroundColor: '#007AFF', padding: 15, borderRadius: 8, alignItems: 'center' },
-  btnTextAdd: { color: '#FFF', fontSize: 16, fontWeight: 'bold' }
+  assignBtn: { 
+    padding: 18, 
+    borderRadius: 16, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 10 
+  },
+  btnText: { fontWeight: '900', fontSize: 16, letterSpacing: 0.5 },
+  cancelBtn: { marginTop: 15, padding: 15, alignItems: 'center' },
+
+  modalOverlayDark: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 25 },
+  modalContentDark: { backgroundColor: '#111827', borderRadius: 24, padding: 25, borderWidth: 1, borderColor: '#1E293B' },
+  modalTitleDark: { fontSize: 20, fontWeight: '900', color: '#FFFFFF', marginBottom: 20, textAlign: 'center' },
+  darkInput: { backgroundColor: '#0F172A', borderRadius: 12, padding: 15, fontSize: 16, color: '#FFFFFF', borderWidth: 1, borderColor: '#1E293B' },
+  modalButtons: { flexDirection: 'row', gap: 15, marginTop: 25 },
+  btnCancel: { flex: 1, padding: 15, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
+  btnTextCancel: { color: '#94A3B8', fontSize: 16, fontWeight: '600' },
+  btnConfirm: { flex: 2, backgroundColor: '#6366F1', padding: 15, borderRadius: 12, alignItems: 'center' },
+  btnTextConfirm: { color: '#FFF', fontSize: 16, fontWeight: 'bold' }
 });
