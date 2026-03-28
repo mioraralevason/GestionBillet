@@ -40,7 +40,7 @@ export default function AddEventCarousel() {
   const isEditing = !!eventId;
 
   const [step, setStep] = useState(1);
-  const totalSteps = 3;
+  const [totalSteps, setTotalSteps] = useState(3);
 
   // Step 1: Info
   const [name, setName] = useState('');
@@ -70,16 +70,20 @@ export default function AddEventCarousel() {
         setDescription(event.description || '');
         setColor(event.color || '#6366F1');
         setImage(event.image || null);
-        
+
         // Fetch existing ticket types if editing
         const types = EventService.getTicketTypes(eventId);
         if (types.length > 0) {
           setTicketTypes(types.map(t => ({
+            id: t.id,
             name: t.name,
             price: t.price.toString(),
             count: '0' // During edit, we don't necessarily want to generate more tickets here
           })));
         }
+        
+        // Skip billetterie step (step 3) when editing - only show steps 1 and 2
+        setTotalSteps(2);
       }
     }
   }, [eventId, isEditing]);
@@ -210,25 +214,62 @@ export default function AddEventCarousel() {
     if (isEditing) {
       success = EventService.updateEvent(eventData);
       if (success) {
-        // Delete old ticket types and recreate new ones when editing
-        EventService.deleteTicketTypesByEvent(eventId);
+        // Get existing ticket types
+        const existingTypes = EventService.getTicketTypes(eventId);
         
-        // Recreate all ticket types
+        // Update or create ticket types
         for (const type of ticketTypes) {
-          const typeId = EventService.addTicketType({
-            event_id: eventId,
-            name: type.name.trim(),
-            price: parseFloat(type.price)
-          });
+          const existingType = existingTypes.find(t => t.id === type.id);
           
-          // Update existing tickets with new price if ticket type already existed
-          if (typeId) {
+          if (existingType) {
+            // Update existing type
+            EventService.updateTicketType({
+              id: type.id,
+              event_id: eventId,
+              name: type.name.trim(),
+              price: parseFloat(type.price)
+            });
+            
+            // Update ticket prices for this type
             db.runSync(
               `UPDATE tickets SET price = ? WHERE event_id = ? AND ticket_type_id = ?`,
               parseFloat(type.price),
               eventId,
-              typeId
+              type.id
             );
+          } else {
+            // Create new type
+            const typeId = EventService.addTicketType({
+              event_id: eventId,
+              name: type.name.trim(),
+              price: parseFloat(type.price)
+            });
+            
+            // Generate tickets for new types if count > 0
+            if (typeId) {
+              const count = parseInt(type.count);
+              if (!isNaN(count) && count > 0) {
+                TicketService.generateTickets(eventId, count, parseFloat(type.price), typeId);
+              }
+            }
+          }
+        }
+        
+        // Delete ticket types that no longer exist in the form
+        for (const existingType of existingTypes) {
+          const stillExists = ticketTypes.find(t => t.id === existingType.id);
+          if (!stillExists) {
+            // Check if there are tickets associated with this type
+            const ticketsForType = db.getAllSync(
+              `SELECT COUNT(*) as count FROM tickets WHERE event_id = ? AND ticket_type_id = ?`,
+              eventId,
+              existingType.id
+            );
+            
+            // Only delete if no tickets are associated
+            if (!ticketsForType[0] || ticketsForType[0].count === 0) {
+              EventService.deleteTicketType(existingType.id);
+            }
           }
         }
       }
@@ -265,15 +306,15 @@ export default function AddEventCarousel() {
 
   const StepIndicator = () => (
     <View style={styles.indicatorContainer}>
-      {[1, 2, 3].map((i) => (
+      {[...Array(totalSteps)].map((_, i) => (
         <View key={i} style={styles.indicatorWrapper}>
           <View style={[
-            styles.dot, 
-            step >= i ? { backgroundColor: color } : { backgroundColor: '#1E293B' }
+            styles.dot,
+            step >= i + 1 ? { backgroundColor: color } : { backgroundColor: '#1E293B' }
           ]} />
-          {i < 3 && <View style={[
-            styles.line, 
-            step > i ? { backgroundColor: color } : { backgroundColor: '#1E293B' }
+          {i < totalSteps - 1 && <View style={[
+            styles.line,
+            step > i + 1 ? { backgroundColor: color } : { backgroundColor: '#1E293B' }
           ]} />}
         </View>
       ))}
@@ -652,15 +693,15 @@ export default function AddEventCarousel() {
           <Text style={styles.prevBtnText}>{step === 1 ? 'Annuler' : 'Retour'}</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity 
-          style={[styles.nextBtn, { backgroundColor: color }]} 
+        <TouchableOpacity
+          style={[styles.nextBtn, { backgroundColor: color }]}
           onPress={handleNext}
         >
           <Text style={styles.nextBtnText}>
-            {step === totalSteps ? (isEditing ? 'Enregistrer' : 'Générer') : 'Suivant'}
+            {step === totalSteps ? 'Enregistrer' : 'Suivant'}
           </Text>
-          <MaterialCommunityIcons 
-            name={step === totalSteps ? "check-circle" : "arrow-right"} 
+          <MaterialCommunityIcons
+            name={step === totalSteps ? "check-circle" : "arrow-right"}
             size={20} 
             color="#000" 
           />

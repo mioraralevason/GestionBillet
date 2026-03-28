@@ -143,15 +143,21 @@ export default function EventDetails() {
 
   /**
    * Handles event deletion with confirmation.
+   * Only accessible by admin users.
    */
   const handleDelete = () => {
+    if (role !== 'admin') {
+      Alert.alert('Accès refusé', 'Seul un administrateur peut supprimer cet événement.');
+      return;
+    }
+    
     Alert.alert(
       'Supprimer l\'événement',
       'Êtes-vous sûr de vouloir supprimer cet événement et tous les billets associés ? Cette action est irréversible.',
       [
         { text: 'Annuler', style: 'cancel' },
-        { 
-          text: 'Supprimer', 
+        {
+          text: 'Supprimer',
           style: 'destructive',
           onPress: () => {
             if (EventService.deleteEvent(eventId)) {
@@ -431,7 +437,7 @@ export default function EventDetails() {
               </View>
             </View>
 
-            {previewSide === 'verso' && event?.image && (
+            {previewSide === 'verso' && event?.image && role === 'admin' && (
               <View style={styles.adjustmentControls}>
                 {!isAdjusting ? (
                   <TouchableOpacity style={[styles.controlBtn, { backgroundColor: theme.tint }]} onPress={() => setIsAdjusting(true)}>
@@ -459,7 +465,7 @@ export default function EventDetails() {
                       <TouchableOpacity onPress={() => setImgY(y => y + 5)}><MaterialCommunityIcons name="chevron-down" size={24} color={theme.icon} /></TouchableOpacity>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 10 }}>
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.danger }]} onPress={() => { setIsAdjusting(false); fetchData(); }}>
+                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#64748B' }]} onPress={() => { setIsAdjusting(false); fetchData(); }}>
                         <Text style={[styles.actionBtnText, { color: '#000' }]}>Annuler</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={[styles.actionBtn, { backgroundColor: themeColor }]} onPress={handleSaveAdjustments}>
@@ -477,8 +483,8 @@ export default function EventDetails() {
       </Modal>
 
       {role === 'admin' && (
-        <TouchableOpacity 
-          style={[styles.card, styles.deleteButton, { borderColor: theme.danger, backgroundColor: 'transparent' }]} 
+        <TouchableOpacity
+          style={[styles.card, styles.deleteButton, { borderColor: theme.danger, backgroundColor: 'transparent' }]}
           onPress={handleDelete}
         >
           <MaterialCommunityIcons name="trash-can-outline" size={20} color={theme.danger} />

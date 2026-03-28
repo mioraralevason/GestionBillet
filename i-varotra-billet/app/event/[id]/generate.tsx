@@ -17,9 +17,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/theme';
 
 export default function GenerateTickets() {
-  const { eventId } = useLocalSearchParams();
+  const { id: idParam } = useLocalSearchParams();
   const router = useRouter();
-  const id = parseInt(eventId as string);
+  const id = parseInt(idParam as string);
 
   const colorScheme = useColorScheme() || 'light';
   const theme = Colors[colorScheme];
@@ -32,11 +32,20 @@ export default function GenerateTickets() {
   const themeColor = event?.color || theme.tint;
 
   const fetchData = useCallback(() => {
+    if (isNaN(id) || !id) {
+      Alert.alert('Erreur', 'ID d\'événement invalide.');
+      router.back();
+      return;
+    }
+    
     const ev = EventService.getEvents().find(e => e.id === id);
     if (ev) {
       setEvent(ev);
       const types = EventService.getTicketTypes(id);
       setTicketTypes(types);
+    } else {
+      Alert.alert('Erreur', 'Événement non trouvé.');
+      router.back();
     }
   }, [id]);
 
@@ -74,6 +83,11 @@ export default function GenerateTickets() {
     const price = parseFloat(newTicketType.price);
     if (isNaN(price) || price <= 0) {
       Alert.alert('Erreur', 'Prix invalide.');
+      return;
+    }
+
+    if (isNaN(id) || !id) {
+      Alert.alert('Erreur', 'ID d\'événement invalide.');
       return;
     }
 

@@ -5,6 +5,7 @@ import { EventService, Event } from '../../services/EventService';
 import { TicketService } from '../../services/TicketService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, Stack, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -13,7 +14,8 @@ export default function EventsList() {
   const [events, setEvents] = useState<(Event & { stats?: any })[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false); // Nouvel état
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -34,6 +36,11 @@ export default function EventsList() {
   useFocusEffect(
     useCallback(() => {
       fetchEvents();
+      const getRole = async () => {
+        const userRole = await AsyncStorage.getItem('userRole');
+        setRole(userRole);
+      };
+      getRole();
     }, [fetchEvents])
   );
 
@@ -53,6 +60,11 @@ export default function EventsList() {
   }, [searchQuery, events, isSearchActive]);
 
   const handleDelete = (id: number) => {
+    if (role !== 'admin') {
+      Alert.alert('Accès refusé', 'Seul un administrateur peut supprimer cet événement.');
+      return;
+    }
+    
     Alert.alert('Supprimer', 'Voulez-vous vraiment supprimer cet événement ?', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: () => { if (EventService.deleteEvent(id)) fetchEvents(); } }
@@ -60,7 +72,7 @@ export default function EventsList() {
   };
 
   const renderItem = ({ item }: { item: Event & { stats?: any } }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.eventCard, { borderLeftColor: item.color || '#6366F1' }]}
       onPress={() => item.id && router.push(`/event/${item.id}`)}
       activeOpacity={0.7}
@@ -82,14 +94,16 @@ export default function EventsList() {
           </View>
         </View>
       </View>
-      <View style={styles.actionColumn}>
-        <TouchableOpacity onPress={() => router.push({ pathname: '/add-event', params: { id: item.id } })} style={styles.editBtn}>
-          <MaterialCommunityIcons name="pencil" size={20} color="#6366F1" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => item.id && handleDelete(item.id)} style={styles.deleteBtn}>
-          <MaterialCommunityIcons name="trash-can-outline" size={20} color="#EF4444" />
-        </TouchableOpacity>
-      </View>
+      {role === 'admin' && (
+        <View style={styles.actionColumn}>
+          <TouchableOpacity onPress={() => router.push({ pathname: '/add-event', params: { id: item.id } })} style={styles.editBtn}>
+            <MaterialCommunityIcons name="pencil" size={20} color="#6366F1" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => item.id && handleDelete(item.id)} style={styles.deleteBtn}>
+            <MaterialCommunityIcons name="trash-can-outline" size={20} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
+      )}
     </TouchableOpacity>
   );
 
