@@ -10,7 +10,7 @@ import {
   SafeAreaView,
   useColorScheme
 } from 'react-native';
-import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { EventService } from '../../../services/EventService';
 import { TicketService } from '../../../services/TicketService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -94,15 +94,6 @@ export default function GenerateTickets() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <Stack.Screen
-        options={{
-          headerStyle: { backgroundColor: theme.header },
-          headerTintColor: theme.text,
-          headerTitle: 'Générer des billets',
-          headerBackVisible: true,
-        }}
-      />
-
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         {/* Event Info */}
         <View style={[styles.eventCard, { backgroundColor: theme.card, borderColor: theme.border, borderLeftColor: themeColor }]}>

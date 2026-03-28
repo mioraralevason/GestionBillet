@@ -297,45 +297,66 @@ export default function TicketList() {
 
       {/* Ticket Type Filter */}
       {!selectionMode && ticketTypes.length > 0 && (
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterContainer}
-        >
-          <TouchableOpacity
-            style={[
-              styles.filterChip,
-              selectedTypeId === null && { backgroundColor: theme.tint }
-            ]}
-            onPress={() => setSelectedTypeId(null)}
+        <View style={[styles.filterSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={styles.filterHeader}>
+            <MaterialCommunityIcons name="filter-variant" size={18} color={theme.tint} />
+            <Text style={[styles.filterLabel, { color: theme.text }]}>Filtrer par type</Text>
+            {selectedTypeId !== null && (
+              <TouchableOpacity onPress={() => setSelectedTypeId(null)} style={styles.clearFilterBtn}>
+                <Text style={[styles.clearFilterText, { color: theme.danger }]}>Effacer</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterScroll}
+            contentContainerStyle={styles.filterContainer}
           >
-            <Text style={[
-              styles.filterChipText,
-              selectedTypeId === null && { color: '#000', fontWeight: 'bold' }
-            ]}>
-              Tous
-            </Text>
-          </TouchableOpacity>
-          
-          {ticketTypes.map(type => (
             <TouchableOpacity
-              key={type.id}
               style={[
                 styles.filterChip,
-                selectedTypeId === type.id && { backgroundColor: theme.tint }
+                selectedTypeId === null && { backgroundColor: theme.tint, borderColor: theme.tint }
               ]}
-              onPress={() => setSelectedTypeId(type.id)}
+              onPress={() => setSelectedTypeId(null)}
             >
+              <MaterialCommunityIcons 
+                name="ticket-outline" 
+                size={16} 
+                color={selectedTypeId === null ? '#000' : theme.tint} 
+              />
               <Text style={[
                 styles.filterChipText,
-                selectedTypeId === type.id && { color: '#000', fontWeight: 'bold' }
+                selectedTypeId === null && { color: '#000', fontWeight: 'bold' }
               ]}>
-                {type.name}
+                Tous
               </Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+
+            {ticketTypes.map(type => (
+              <TouchableOpacity
+                key={type.id}
+                style={[
+                  styles.filterChip,
+                  selectedTypeId === type.id && { backgroundColor: theme.tint, borderColor: theme.tint }
+                ]}
+                onPress={() => setSelectedTypeId(type.id)}
+              >
+                <MaterialCommunityIcons 
+                  name="ticket" 
+                  size={16} 
+                  color={selectedTypeId === type.id ? '#000' : theme.tint} 
+                />
+                <Text style={[
+                  styles.filterChipText,
+                  selectedTypeId === type.id && { color: '#000', fontWeight: 'bold' }
+                ]}>
+                  {type.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
       )}
 
       <FlatList
@@ -449,19 +470,48 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold'
   },
-  filterScroll: { maxHeight: 50 },
-  filterContainer: { flexDirection: 'row', paddingHorizontal: 15, gap: 10 },
+  filterSection: {
+    marginHorizontal: 15,
+    marginBottom: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  filterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 8,
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  clearFilterBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  clearFilterText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  filterScroll: { maxHeight: 45 },
+  filterContainer: { flexDirection: 'row', gap: 8 },
   filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 20,
     backgroundColor: '#1E293B',
     borderWidth: 1,
-    borderColor: '#334155'
+    borderColor: '#334155',
+    gap: 6,
   },
   filterChipText: {
     color: '#94A3B8',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600'
   }
 });

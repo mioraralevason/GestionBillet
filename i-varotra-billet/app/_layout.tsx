@@ -61,19 +61,28 @@ export default function Layout() {
           headerTitle: 'Nouvel Événement' 
         }} 
       />
-      <Stack.Screen 
-        name="event/[id]" 
-        options={{ 
-          headerShown: true, 
-          headerTitle: 'Détails de l\'Événement' 
-        }} 
+      <Stack.Screen
+        name="event/[id]"
+        options={{
+          headerShown: true,
+          headerTitle: 'Détails de l\'Événement'
+        }}
       />
-      <Stack.Screen 
-        name="tickets/[eventId]" 
-        options={{ 
-          headerShown: true, 
-          headerTitle: 'Liste des Billets' 
-        }} 
+      <Stack.Screen
+        name="event/[id]/generate"
+        options={{
+          headerShown: true,
+          headerTitle: 'Générer des billets',
+          headerStyle: { backgroundColor: '#111827' },
+          headerTintColor: '#FFFFFF',
+        }}
+      />
+      <Stack.Screen
+        name="tickets/[eventId]"
+        options={{
+          headerShown: true,
+          headerTitle: 'Liste des Billets'
+        }}
       />
       <Stack.Screen 
         name="assign-ticket/[id]" 

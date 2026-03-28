@@ -250,55 +250,59 @@ export default function EventDetails() {
         </View>
       )}
 
-      {role === 'admin' && (
+      {/* Actions Grid - 2x2 Cards */}
+      <View style={styles.actionsGridContainer}>
+        {role === 'admin' && (
+          <TouchableOpacity
+            style={[styles.actionCard, { backgroundColor: themeColor }]}
+            onPress={() => router.push(`/event/${id}/generate`)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.actionIconWrapper}>
+              <MaterialCommunityIcons name="ticket-outline" size={32} color="#000" />
+            </View>
+            <Text style={[styles.actionText, { color: '#000' }]}>Générer billet</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
-          style={[styles.card, { backgroundColor: themeColor }]}
-          onPress={() => router.push(`/event/${eventId}/generate`)}
+          style={[styles.actionCard, { backgroundColor: theme.success }]}
+          onPress={handleExportPdf}
+          disabled={exporting}
+          activeOpacity={0.8}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-            <MaterialCommunityIcons name="ticket-outline" size={24} color="#000" />
-            <Text style={[styles.buttonText, { color: '#000' }]}>Générer des billets</Text>
+          <View style={styles.actionIconWrapper}>
+            {exporting ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <MaterialCommunityIcons name="file-pdf-box" size={32} color="#000" />
+            )}
           </View>
+          <Text style={[styles.actionText, { color: '#000' }]}>Exporter PDF</Text>
         </TouchableOpacity>
-      )}
 
-      <TouchableOpacity 
-        style={[styles.card, { backgroundColor: theme.success, marginTop: role === 'admin' ? 0 : 20 }]} 
-        onPress={handleExportPdf}
-        disabled={exporting}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-          {exporting ? (
-            <ActivityIndicator color="#000" />
-          ) : (
-            <MaterialCommunityIcons name="file-pdf-box" size={24} color="#000" />
-          )}
-          <Text style={[styles.buttonText, { color: '#000' }]}>Exporter en PDF (A4 - 3x3)</Text>
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity 
-        style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 0 }]} 
-        onPress={() => setShowPreview(true)}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-          <MaterialCommunityIcons name="eye" size={24} color={theme.tint} />
-          <Text style={[styles.buttonText, { color: theme.tint }]}>Visualiser le Modèle</Text>
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity 
-        style={[styles.card, styles.viewTickets, { backgroundColor: theme.card, borderColor: theme.border }]}
-        onPress={() => router.push(`/tickets/${eventId}`)}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <MaterialCommunityIcons name="ticket-confirmation" size={24} color={themeColor} />
-            <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0, marginLeft: 10 }]}>Voir la liste des billets</Text>
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}
+          onPress={() => setShowPreview(true)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.actionIconWrapper, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
+            <MaterialCommunityIcons name="eye" size={32} color={theme.tint} />
           </View>
-          <MaterialCommunityIcons name="chevron-right" size={24} color={theme.icon} />
-        </View>
-      </TouchableOpacity>
+          <Text style={[styles.actionText, { color: theme.tint }]}>Visualiser modèle</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}
+          onPress={() => router.push(`/tickets/${eventId}`)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.actionIconWrapper, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
+            <MaterialCommunityIcons name="ticket-confirmation" size={32} color={themeColor} />
+          </View>
+          <Text style={[styles.actionText, { color: theme.text }]}>Voir liste</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Preview Modal */}
       <Modal visible={showPreview} transparent animationType="slide">
@@ -516,6 +520,10 @@ const styles = StyleSheet.create({
   button: { flexDirection: 'row', borderRadius: 10, padding: 15, alignItems: 'center', justifyContent: 'center', gap: 10 },
   buttonText: { fontSize: 16, fontWeight: 'bold' },
   viewTickets: { marginTop: 0, flexDirection: 'column' },
+  actionsGridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 10, gap: 15 },
+  actionCard: { width: '47%', padding: 20, borderRadius: 16, alignItems: 'center', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  actionIconWrapper: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  actionText: { fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 20 },
   previewContent: { borderRadius: 24, padding: 20, maxHeight: '90%', backgroundColor: '#111827', borderWidth: 1, borderColor: '#1E293B' },
   previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
