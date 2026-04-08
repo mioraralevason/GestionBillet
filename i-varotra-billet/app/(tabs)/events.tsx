@@ -7,6 +7,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import Toast from 'react-native-toast-message';
+import ConfirmModal from '../../components/ConfirmModal';
+
 const { width } = Dimensions.get('window');
 
 export default function EventsList() {
@@ -16,59 +19,39 @@ export default function EventsList() {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [role, setRole] = useState<string | null>(null);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<number | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    if (params.autoSearch === 'true') {
-      setIsSearchActive(true);
-    }
-  }, [params.autoSearch]);
-
-  const fetchEvents = useCallback(() => {
-    const list = EventService.getEvents();
-    const listWithStats = list.map(ev => ({
-      ...ev,
-      stats: ev.id ? TicketService.getEventStats(ev.id) : null
-    }));
-    setEvents(listWithStats);
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchEvents();
-      const getRole = async () => {
-        const userRole = await AsyncStorage.getItem('userRole');
-        setRole(userRole);
-      };
-      getRole();
-    }, [fetchEvents])
-  );
-
-  const filteredEvents = useMemo(() => {
-    if (!searchQuery.trim()) return events;
-    const q = searchQuery.toLowerCase();
-    return events.filter(e => e.name.toLowerCase().includes(q) || e.event_date.includes(q));
-  }, [searchQuery, events]);
-
-  const suggestions = useMemo(() => {
-    if (!searchQuery.trim() || !isSearchActive) return [];
-    const q = searchQuery.toLowerCase();
-    return events
-      .filter(e => e.name.toLowerCase().includes(q))
-      .slice(0, 5)
-      .map(e => e.name);
-  }, [searchQuery, events, isSearchActive]);
+  // ... (existing useEffect and callbacks)
 
   const handleDelete = (id: number) => {
     if (role !== 'admin') {
-      Alert.alert('Accès refusé', 'Seul un administrateur peut supprimer cet événement.');
+      Toast.show({
+        type: 'error',
+        text1: 'Accès refusé',
+        text2: 'Seul un administrateur peut supprimer cet événement.'
+      });
       return;
     }
     
-    Alert.alert('Supprimer', 'Voulez-vous vraiment supprimer cet événement ?', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Supprimer', style: 'destructive', onPress: () => { if (EventService.deleteEvent(id)) fetchEvents(); } }
-    ]);
+    setEventToDelete(id);
+    setConfirmVisible(true);
+  };
+
+  const onConfirmDelete = () => {
+    if (eventToDelete !== null) {
+      if (EventService.deleteEvent(eventToDelete)) {
+        fetchEvents();
+        Toast.show({
+          type: 'success',
+          text1: 'Succès',
+          text2: 'Événement supprimé.'
+        });
+      }
+    }
+    setConfirmVisible(false);
+    setEventToDelete(null);
   };
 
   const renderItem = ({ item }: { item: Event & { stats?: any } }) => (

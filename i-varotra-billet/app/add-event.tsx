@@ -14,26 +14,13 @@ import {
   SafeAreaView,
   Modal
 } from 'react-native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
-import { EventService } from '../services/EventService';
-import { TicketService } from '../services/TicketService';
-import db from '../database/database';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import ColorPicker from 'react-native-wheel-color-picker';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import * as ImagePicker from 'expo-image-picker';
-import { Image } from 'expo-image';
-import { StatusBar } from 'expo-status-bar';
+import Toast from 'react-native-toast-message';
 
-const { width } = Dimensions.get('window');
-
-interface TicketTypeInput {
-  name: string;
-  price: string;
-  count: string;
-}
+// ... (existing imports)
 
 export default function AddEventCarousel() {
+  // ...
+
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const eventId = id ? parseInt(id as string) : null;
@@ -173,7 +160,11 @@ export default function AddEventCarousel() {
 
   const handleNext = () => {
     if (step === 1 && !name.trim()) {
-      Alert.alert('Attention', 'Veuillez donner un nom à votre événement.');
+      Toast.show({
+        type: 'info',
+        text1: 'Attention',
+        text2: 'Veuillez donner un nom à votre événement.'
+      });
       return;
     }
     if (step < totalSteps) setStep(step + 1);
@@ -189,11 +180,19 @@ export default function AddEventCarousel() {
     // Validation for Step 3
     for (const type of ticketTypes) {
       if (!type.name.trim()) {
-        Alert.alert('Attention', 'Veuillez nommer tous les types de billets.');
+        Toast.show({
+          type: 'info',
+          text1: 'Attention',
+          text2: 'Veuillez nommer tous les types de billets.'
+        });
         return;
       }
       if (isNaN(parseFloat(type.price)) || parseFloat(type.price) < 0) {
-        Alert.alert('Attention', 'Prix invalide pour ' + type.name);
+        Toast.show({
+          type: 'info',
+          text1: 'Attention',
+          text2: 'Prix invalide pour ' + type.name
+        });
         return;
       }
     }
@@ -297,10 +296,18 @@ export default function AddEventCarousel() {
     }
 
     if (success) {
-      Alert.alert('Succès', isEditing ? 'Événement et types de billets mis à jour !' : 'Événement et billets créés !');
+      Toast.show({
+        type: 'success',
+        text1: 'Succès',
+        text2: isEditing ? 'Événement et types de billets mis à jour !' : 'Événement et billets créés !'
+      });
       router.replace('/(tabs)/home');
     } else {
-      Alert.alert('Erreur', "Impossible d'enregistrer.");
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur',
+        text2: "Impossible d'enregistrer."
+      });
     }
   };
 

@@ -5,6 +5,8 @@ import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initDB } from '../database/database';
 
+import Toast from 'react-native-toast-message';
+
 export default function Layout() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -50,57 +52,60 @@ export default function Layout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen 
-        name="add-event" 
-        options={{ 
-          presentation: 'modal', 
-          headerShown: true, 
-          headerTitle: 'Nouvel Événement' 
-        }} 
-      />
-      <Stack.Screen
-        name="event/[id]"
-        options={{
-          headerShown: true,
-          headerTitle: 'Détails de l\'Événement'
-        }}
-      />
-      <Stack.Screen
-        name="event/[id]/generate"
-        options={{
-          headerShown: true,
-          headerTitle: 'Générer des billets',
-          headerStyle: { backgroundColor: '#111827' },
-          headerTintColor: '#FFFFFF',
-        }}
-      />
-      <Stack.Screen
-        name="tickets/[eventId]"
-        options={{
-          headerShown: true,
-          headerTitle: 'Liste des Billets'
-        }}
-      />
-      <Stack.Screen 
-        name="assign-ticket/[id]" 
-        options={{ 
-          presentation: 'modal',
-          headerShown: true, 
-          headerTitle: 'Assigner Billet' 
-        }} 
-      />
-      <Stack.Screen 
-        name="assign-ticket/batch" 
-        options={{ 
-          presentation: 'modal',
-          headerShown: true, 
-          headerTitle: 'Assignation Groupée' 
-        }} 
-      />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="add-event" 
+          options={{ 
+            presentation: 'modal', 
+            headerShown: true, 
+            headerTitle: 'Nouvel Événement' 
+          }} 
+        />
+        <Stack.Screen
+          name="event/[id]"
+          options={{
+            headerShown: true,
+            headerTitle: 'Détails de l\'Événement'
+          }}
+        />
+        <Stack.Screen
+          name="event/[id]/generate"
+          options={{
+            headerShown: true,
+            headerTitle: 'Générer des billets',
+            headerStyle: { backgroundColor: '#111827' },
+            headerTintColor: '#FFFFFF',
+          }}
+        />
+        <Stack.Screen
+          name="tickets/[eventId]"
+          options={{
+            headerShown: true,
+            headerTitle: 'Liste des Billets'
+          }}
+        />
+        <Stack.Screen 
+          name="assign-ticket/[id]" 
+          options={{ 
+            presentation: 'modal',
+            headerShown: true, 
+            headerTitle: 'Assigner Billet' 
+          }} 
+        />
+        <Stack.Screen 
+          name="assign-ticket/batch" 
+          options={{ 
+            presentation: 'modal',
+            headerShown: true, 
+            headerTitle: 'Assignation Groupée' 
+          }} 
+        />
+      </Stack>
+      <Toast />
+    </>
   );
 }
 

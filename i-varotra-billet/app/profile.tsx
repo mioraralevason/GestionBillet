@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  TextInput, 
-  Alert, 
-  SafeAreaView, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  SafeAreaView,
   StatusBar,
   KeyboardAvoidingView,
   Platform,
@@ -16,16 +15,21 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateUserPin } from '../database/database';
+import ToastMessage from '../components/ToastMessage';
 
 export default function Profile() {
   const router = useRouter();
   const [role, setRole] = useState<string>('');
-  
+
   // États pour le changement de PIN
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [showPasswordFields, setShowPasswordFields] = useState(false);
+  
+  // Toast state
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastConfig, setToastConfig] = useState<{ title: string; message: string; type: 'success' | 'error' | 'warning' | 'info' }>({ title: '', message: '', type: 'info' });
 
   useEffect(() => {
     const getRole = async () => {
@@ -37,12 +41,14 @@ export default function Profile() {
 
   const handleUpdatePin = async () => {
     if (newPin.length !== 4) {
-      Alert.alert('Erreur', 'Le nouveau PIN doit contenir 4 chiffres.');
+      setToastConfig({ title: 'Erreur', message: 'Le nouveau PIN doit contenir 4 chiffres.', type: 'error' });
+      setToastVisible(true);
       return;
     }
 
     if (newPin !== confirmPin) {
-      Alert.alert('Erreur', 'Les nouveaux PIN ne correspondent pas.');
+      setToastConfig({ title: 'Erreur', message: 'Les nouveaux PIN ne correspondent pas.', type: 'error' });
+      setToastVisible(true);
       return;
     }
 
@@ -50,13 +56,15 @@ export default function Profile() {
     const success = updateUserPin(role, newPin);
 
     if (success) {
-      Alert.alert('Succès', 'Votre PIN a été mis à jour avec succès.');
+      setToastConfig({ title: 'Succès', message: 'Votre PIN a été mis à jour avec succès.', type: 'success' });
+      setToastVisible(true);
       setCurrentPin('');
       setNewPin('');
       setConfirmPin('');
       setShowPasswordFields(false);
     } else {
-      Alert.alert('Erreur', 'Impossible de mettre à jour le PIN.');
+      setToastConfig({ title: 'Erreur', message: 'Impossible de mettre à jour le PIN.', type: 'error' });
+      setToastVisible(true);
     }
   };
 
@@ -167,7 +175,7 @@ export default function Profile() {
           )}
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.logoutBtn}
           onPress={async () => {
             await AsyncStorage.removeItem('userRole');
@@ -178,6 +186,15 @@ export default function Profile() {
           <Text style={styles.logoutText}>Se déconnecter</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Toast Notification */}
+      <ToastMessage
+        visible={toastVisible}
+        title={toastConfig.title}
+        message={toastConfig.message}
+        type={toastConfig.type}
+        onClose={() => setToastVisible(false)}
+      />
     </SafeAreaView>
   );
 }

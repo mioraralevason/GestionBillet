@@ -4,6 +4,8 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, Modal, A
 import { BuyerService, Buyer } from '../../services/BuyerService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, Stack } from 'expo-router';
+import ConfirmModal from '../../components/ConfirmModal';
+import ToastMessage from '../../components/ToastMessage';
 
 const { width } = Dimensions.get('window');
 
@@ -12,10 +14,14 @@ export default function BuyersList() {
   const [search, setSearch] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastConfig, setToastConfig] = useState<{ title: string; message?: string; type: 'success' | 'error' | 'warning' | 'info' }>({ title: '', type: 'info' });
+
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [buyerToDelete, setBuyerToDelete] = useState<Buyer | null>(null);
 
   const fetchBuyers = useCallback(() => {
     const list = BuyerService.getBuyers();
@@ -31,10 +37,26 @@ export default function BuyersList() {
   }, [search, buyers]);
 
   const handleSaveBuyer = () => {
-    if (!name.trim()) { Alert.alert('Erreur', 'Le nom est obligatoire.'); return; }
+    if (!name.trim()) {
+      setToastConfig({ title: 'Erreur', message: 'Le nom est obligatoire.', type: 'error' });
+      setToastVisible(true);
+      return;
+    }
     let success = editingId ? BuyerService.updateBuyer({ id: editingId, name, phone }) : !!BuyerService.addBuyer({ name, phone });
-    if (success) { setModalVisible(false); fetchBuyers(); }
-    else { Alert.alert('Erreur', "Impossible d'enregistrer."); }
+    if (success) {
+      setModalVisible(false);
+      fetchBuyers();
+      setToastConfig({
+        title: 'Succès',
+        message: editingId ? 'Acheteur modifié avec succès.' : 'Acheteur ajouté avec succès.',
+        type: 'success'
+      });
+      setToastVisible(true);
+    }
+    else {
+      setToastConfig({ title: 'Erreur', message: "Impossible d'enregistrer.", type: 'error' });
+      setToastVisible(true);
+    }
   };
 
   const openModal = (buyer?: Buyer) => {
@@ -62,12 +84,11 @@ export default function BuyersList() {
         <TouchableOpacity onPress={() => openModal(item)} style={styles.actionBtn}>
           <MaterialCommunityIcons name="pencil" size={20} color="#6366F1" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => {
-            Alert.alert("Supprimer", "Supprimer cet acheteur ?", [
-              { text: "Annuler", style: "cancel" },
-              { text: "Supprimer", style: "destructive", onPress: () => item.id && BuyerService.deleteBuyer(item.id) && fetchBuyers() }
-            ]);
-          }} 
+        <TouchableOpacity
+          onPress={() => {
+            setBuyerToDelete(item);
+            setDeleteModalVisible(true);
+          }}
           style={styles.actionBtn}
         >
           <MaterialCommunityIcons name="trash-can-outline" size={20} color="#EF4444" />
@@ -127,7 +148,7 @@ export default function BuyersList() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{editingId ? "Modifier l'acheteur" : "Nouvel Acheteur"}</Text>
-            
+
             <View style={styles.inputGroup}>
               <Text style={styles.label}>NOM COMPLET</Text>
               <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Ex: Jean Dupont" placeholderTextColor="#4B5563" />
@@ -149,6 +170,42 @@ export default function BuyersList() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        visible={deleteModalVisible}
+        title="Supprimer l'acheteur"
+        message={`Êtes-vous sûr de vouloir supprimer "${buyerToDelete?.name}" ?`}
+        onConfirm={() => {
+          if (buyerToDelete?.id) {
+            BuyerService.deleteBuyer(buyerToDelete.id);
+            fetchBuyers();
+            setToastConfig({
+              title: 'Succès',
+              message: 'Acheteur supprimé avec succès.',
+              type: 'success'
+            });
+            setToastVisible(true);
+          }
+          setDeleteModalVisible(false);
+          setBuyerToDelete(null);
+        }}
+        onCancel={() => {
+          setDeleteModalVisible(false);
+          setBuyerToDelete(null);
+        }}
+        confirmText="Supprimer"
+        type="danger"
+      />
+
+      {/* Toast Notification */}
+      <ToastMessage
+        visible={toastVisible}
+        title={toastConfig.title}
+        message={toastConfig.message}
+        type={toastConfig.type}
+        onClose={() => setToastVisible(false)}
+      />
     </SafeAreaView>
   );
 }
