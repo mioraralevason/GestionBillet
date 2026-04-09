@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   SafeAreaView,
   useColorScheme
 } from 'react-native';
@@ -15,6 +14,7 @@ import { EventService } from '../../../services/EventService';
 import { TicketService } from '../../../services/TicketService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/theme';
+import { showSuccess, showError } from '../../../utils/toast';
 
 export default function GenerateTickets() {
   const { id: idParam } = useLocalSearchParams();
@@ -33,18 +33,18 @@ export default function GenerateTickets() {
 
   const fetchData = useCallback(() => {
     if (isNaN(id) || !id) {
-      Alert.alert('Erreur', 'ID d\'événement invalide.');
+      showError('ID d\'événement invalide.');
       router.back();
       return;
     }
-    
+
     const ev = EventService.getEvents().find(e => e.id === id);
     if (ev) {
       setEvent(ev);
       const types = EventService.getTicketTypes(id);
       setTicketTypes(types);
     } else {
-      Alert.alert('Erreur', 'Événement non trouvé.');
+      showError('Événement non trouvé.');
       router.back();
     }
   }, [id]);
@@ -59,35 +59,35 @@ export default function GenerateTickets() {
     const count = parseInt(generateQuantities[ticketTypeId] || '0');
 
     if (isNaN(count) || count <= 0) {
-      Alert.alert('Erreur', 'Veuillez entrer une quantité valide.');
+      showError('Veuillez entrer une quantité valide.');
       return;
     }
 
     if (TicketService.generateTickets(id, count, price, ticketTypeId)) {
-      Alert.alert('Succès', `${count} billets générés.`);
+      showSuccess(`${count} billets générés.`);
       const newQuantities = { ...generateQuantities };
       delete newQuantities[ticketTypeId];
       setGenerateQuantities(newQuantities);
       fetchData();
     } else {
-      Alert.alert('Erreur', 'Échec de la génération des billets.');
+      showError('Échec de la génération des billets.');
     }
   };
 
   const handleAddTicketType = () => {
     if (!newTicketType.name.trim() || !newTicketType.price) {
-      Alert.alert('Erreur', 'Veuillez remplir le nom et le prix.');
+      showError('Veuillez remplir le nom et le prix.');
       return;
     }
 
     const price = parseFloat(newTicketType.price);
     if (isNaN(price) || price <= 0) {
-      Alert.alert('Erreur', 'Prix invalide.');
+      showError('Prix invalide.');
       return;
     }
 
     if (isNaN(id) || !id) {
-      Alert.alert('Erreur', 'ID d\'événement invalide.');
+      showError('ID d\'événement invalide.');
       return;
     }
 
@@ -100,9 +100,9 @@ export default function GenerateTickets() {
     if (typeId) {
       setNewTicketType({ name: '', price: '' });
       fetchData();
-      Alert.alert('Succès', 'Type de billet ajouté.');
+      showSuccess('Type de billet ajouté.');
     } else {
-      Alert.alert('Erreur', 'Impossible d\'ajouter le type de billet.');
+      showError('Impossible d\'ajouter le type de billet.');
     }
   };
 

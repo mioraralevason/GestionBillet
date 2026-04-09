@@ -8,8 +8,10 @@ import {
   Dimensions,
   Platform,
   Animated,
+  Keyboard,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
 const { width } = Dimensions.get('window');
@@ -26,43 +28,44 @@ interface ConfirmModalProps {
   cancelText?: string;
   type?: ConfirmModalType;
   showCancel?: boolean;
+  dismissKeyboardOnOpen?: boolean;
 }
 
 const typeConfig = {
   danger: {
     icon: 'alert-circle-outline' as const,
     color: '#EF4444',
-    bgColor: 'rgba(239, 68, 68, 0.1)',
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-    buttonBg: '#EF4444',
+    gradient: ['#EF4444', '#DC2626'] as [string, string],
+    bgColor: 'rgba(239, 68, 68, 0.12)',
+    glowColor: 'rgba(239, 68, 68, 0.4)',
   },
   primary: {
     icon: 'information-outline' as const,
     color: '#6366F1',
-    bgColor: 'rgba(99, 102, 241, 0.1)',
-    borderColor: 'rgba(99, 102, 241, 0.3)',
-    buttonBg: '#6366F1',
+    gradient: ['#818CF8', '#6366F1'] as [string, string],
+    bgColor: 'rgba(99, 102, 241, 0.12)',
+    glowColor: 'rgba(99, 102, 241, 0.4)',
   },
   success: {
     icon: 'check-circle-outline' as const,
     color: '#10B981',
-    bgColor: 'rgba(16, 185, 129, 0.1)',
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    buttonBg: '#10B981',
+    gradient: ['#34D399', '#10B981'] as [string, string],
+    bgColor: 'rgba(16, 185, 129, 0.12)',
+    glowColor: 'rgba(16, 185, 129, 0.4)',
   },
   warning: {
     icon: 'alert-outline' as const,
     color: '#F59E0B',
-    bgColor: 'rgba(245, 158, 11, 0.1)',
-    borderColor: 'rgba(245, 158, 11, 0.3)',
-    buttonBg: '#F59E0B',
+    gradient: ['#FBBF24', '#F59E0B'] as [string, string],
+    bgColor: 'rgba(245, 158, 11, 0.12)',
+    glowColor: 'rgba(245, 158, 11, 0.4)',
   },
   info: {
     icon: 'information-outline' as const,
     color: '#3B82F6',
-    bgColor: 'rgba(59, 130, 246, 0.1)',
-    borderColor: 'rgba(59, 130, 246, 0.3)',
-    buttonBg: '#3B82F6',
+    gradient: ['#60A5FA', '#3B82F6'] as [string, string],
+    bgColor: 'rgba(59, 130, 246, 0.12)',
+    glowColor: 'rgba(59, 130, 246, 0.4)',
   },
 };
 
@@ -76,41 +79,77 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   cancelText = 'Annuler',
   type = 'primary',
   showCancel = true,
+  dismissKeyboardOnOpen = true,
 }) => {
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+  const iconScaleAnim = useRef(new Animated.Value(0.5)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (visible) {
+      if (dismissKeyboardOnOpen) {
+        Keyboard.dismiss();
+      }
+      
+      // Main modal animation
       Animated.parallel([
         Animated.spring(scaleAnim, {
           toValue: 1,
           useNativeDriver: true,
-          tension: 50,
-          friction: 7,
+          tension: 60,
+          friction: 9,
         }),
         Animated.timing(opacityAnim, {
           toValue: 1,
-          duration: 200,
+          duration: 250,
           useNativeDriver: true,
         }),
+        Animated.spring(iconScaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 70,
+          friction: 8,
+          delay: 80,
+        }),
+      ]).start();
+
+      // Subtle pulse animation for the icon
+      Animated.sequence([
+        Animated.delay(300),
+        Animated.parallel([
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1.08,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+          ]),
+        ]),
       ]).start();
     } else {
-      scaleAnim.setValue(0.8);
+      scaleAnim.setValue(0.85);
       opacityAnim.setValue(0);
+      iconScaleAnim.setValue(0.5);
+      pulseAnim.setValue(1);
     }
   }, [visible]);
 
   const handleClose = () => {
     Animated.parallel([
       Animated.timing(scaleAnim, {
-        toValue: 0.8,
-        duration: 150,
+        toValue: 0.85,
+        duration: 180,
         useNativeDriver: true,
       }),
       Animated.timing(opacityAnim, {
         toValue: 0,
-        duration: 150,
+        duration: 180,
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -126,14 +165,17 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
       visible={visible}
       animationType="none"
       onRequestClose={handleClose}
+      statusBarTranslucent
     >
       <View style={styles.overlay}>
+        {/* Backdrop with blur */}
         {Platform.OS === 'ios' ? (
-          <BlurView intensity={30} style={StyleSheet.absoluteFill} tint="dark" />
+          <BlurView intensity={40} style={StyleSheet.absoluteFill} tint="dark" />
         ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.75)' }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.8)' }]} />
         )}
 
+        {/* Modal container */}
         <Animated.View
           style={[
             styles.container,
@@ -143,43 +185,73 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             },
           ]}
         >
-          {/* Icon with colored background */}
-          <View style={[styles.iconContainer, { backgroundColor: config.bgColor }]}>
-            <View style={[styles.iconCircle, { borderColor: config.borderColor }]}>
-              <MaterialCommunityIcons
-                name={config.icon}
-                size={40}
-                color={config.color}
-              />
-            </View>
-          </View>
+          {/* Gradient glow behind icon */}
+          <View style={[styles.iconGlow, { backgroundColor: config.glowColor }]} />
+          
+          {/* Icon with gradient background */}
+          <Animated.View 
+            style={[
+              styles.iconWrapper,
+              {
+                transform: [{ scale: iconScaleAnim }],
+              }
+            ]}
+          >
+            <LinearGradient
+              colors={config.gradient}
+              style={styles.iconGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                <MaterialCommunityIcons
+                  name={config.icon}
+                  size={36}
+                  color="#FFFFFF"
+                />
+              </Animated.View>
+            </LinearGradient>
+          </Animated.View>
 
           {/* Title and Message */}
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
+          <Text style={styles.message} numberOfLines={4}>{message}</Text>
+
+          {/* Divider line */}
+          <View style={styles.divider} />
 
           {/* Buttons */}
           <View style={styles.buttonContainer}>
             {showCancel && (
               <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
+                style={styles.cancelButton}
                 onPress={handleClose}
-                activeOpacity={0.7}
+                activeOpacity={0.6}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
+                <Ionicons name="close" size={18} color="#94A3B8" style={styles.cancelIcon} />
                 <Text style={styles.cancelButtonText}>{cancelText}</Text>
               </TouchableOpacity>
             )}
 
             <TouchableOpacity
               style={[
-                styles.button,
                 styles.confirmButton,
-                { backgroundColor: config.buttonBg },
+                !showCancel && styles.confirmButtonFullWidth,
               ]}
               onPress={onConfirm}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.confirmButtonText}>{confirmText}</Text>
+              <LinearGradient
+                colors={config.gradient}
+                style={styles.confirmGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.confirmButtonText}>{confirmText}</Text>
+                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={styles.confirmIcon} />
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -193,92 +265,124 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   container: {
-    width: width * 0.85,
-    maxWidth: 400,
-    backgroundColor: '#1E293B',
-    borderRadius: 24,
-    padding: 28,
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#1A1F2E',
+    borderRadius: 28,
+    paddingTop: 32,
+    paddingBottom: 20,
+    paddingHorizontal: 24,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.4,
-    shadowRadius: 30,
-    elevation: 15,
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.5,
+    shadowRadius: 40,
+    elevation: 20,
   },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  iconCircle: {
+  iconGlow: {
+    position: 'absolute',
+    top: -10,
+    left: '50%',
+    marginLeft: -35,
     width: 70,
     height: 70,
     borderRadius: 35,
+    opacity: 0.3,
+  },
+  iconWrapper: {
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  iconGradient: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    backgroundColor: '#1E293B',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#F8FAFC',
-    marginBottom: 12,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#F1F5F9',
+    marginBottom: 10,
     textAlign: 'center',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   message: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#94A3B8',
-    marginBottom: 28,
+    marginBottom: 8,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 21,
+    paddingHorizontal: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginHorizontal: 0,
+    marginVertical: 16,
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: 12,
   },
-  button: {
+  cancelButton: {
     flex: 1,
-    height: 52,
+    flexDirection: 'row',
+    height: 48,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  cancelButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: '#334155',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  confirmButton: {
-    shadowColor: '#000',
+  cancelIcon: {
+    marginRight: 6,
   },
   cancelButtonText: {
     color: '#94A3B8',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
+  },
+  confirmButton: {
+    flex: 1.5,
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  confirmButtonFullWidth: {
+    flex: 1,
+  },
+  confirmGradient: {
+    flexDirection: 'row',
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  confirmIcon: {
+    marginLeft: 6,
   },
   confirmButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
 });
 

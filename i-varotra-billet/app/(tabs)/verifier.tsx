@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { AttendanceService, ValidationResult } from '../../services/AttendanceService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';

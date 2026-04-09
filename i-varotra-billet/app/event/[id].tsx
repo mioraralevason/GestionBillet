@@ -1,16 +1,15 @@
 // app/event/[id].tsx
 import React, { useState, useCallback } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  TextInput, 
-  Alert, 
-  ActivityIndicator, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
   Modal,
-  useColorScheme 
+  useColorScheme
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
 import { EventService, Event } from '../../services/EventService';
@@ -20,6 +19,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { Colors } from '../../constants/theme';
+import ConfirmModal from '../../components/ConfirmModal';
+import { showSuccess, showError, showWarning, showInfo } from '../../utils/toast';
 
 /**
  * Screen displaying detailed information about a specific event.
@@ -49,6 +50,14 @@ export default function EventDetails() {
   const [imgX, setImgX] = useState(0);
   const [imgY, setImgY] = useState(0);
   const [isClearMode, setIsClearMode] = useState(false);
+
+  // Confirmation modals
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showExportInfo, setShowExportInfo] = useState(false);
+  const [showExportError, setShowExportError] = useState(false);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [showSaveError, setShowSaveError] = useState(false);
+  const [showDeleteError, setShowDeleteError] = useState(false);
 
   const themeColor = event?.color || theme.tint;
 
@@ -108,14 +117,14 @@ export default function EventDetails() {
     setExporting(true);
     const tickets = TicketService.getTicketsByEvent(eventId);
     if (tickets.length === 0) {
-      Alert.alert('Information', 'Aucun billet à exporter.');
+      setShowExportInfo(true);
       setExporting(false);
       return;
     }
 
     const success = await PdfService.exportTicketsToPdf(event, tickets);
     if (!success) {
-      Alert.alert('Erreur', 'Impossible de générer le PDF.');
+      setShowExportError(true);
     }
     setExporting(false);
   };
@@ -135,9 +144,9 @@ export default function EventDetails() {
     if (EventService.updateEvent(updatedEvent)) {
       setEvent(updatedEvent);
       setIsAdjusting(false);
-      Alert.alert('Succès', 'Ajustements enregistrés.');
+      setShowSaveSuccess(true);
     } else {
-      Alert.alert('Erreur', 'Impossible d\'enregistrer.');
+      setShowSaveError(true);
     }
   };
 
@@ -147,28 +156,20 @@ export default function EventDetails() {
    */
   const handleDelete = () => {
     if (role !== 'admin') {
-      Alert.alert('Accès refusé', 'Seul un administrateur peut supprimer cet événement.');
+      showWarning('Seul un administrateur peut supprimer cet événement.');
       return;
     }
-    
-    Alert.alert(
-      'Supprimer l\'événement',
-      'Êtes-vous sûr de vouloir supprimer cet événement et tous les billets associés ? Cette action est irréversible.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: () => {
-            if (EventService.deleteEvent(eventId)) {
-              router.back();
-            } else {
-              Alert.alert('Erreur', 'Impossible de supprimer l\'événement.');
-            }
-          }
-        }
-      ]
-    );
+
+    setShowDeleteConfirm(true);
+  };
+
+  const executeDelete = () => {
+    setShowDeleteConfirm(false);
+    if (EventService.deleteEvent(eventId)) {
+      router.back();
+    } else {
+      setShowDeleteError(true);
+    }
   };
 
   if (loading) return <View style={[styles.center, { backgroundColor: theme.background }]}><ActivityIndicator size="large" color={theme.tint} /></View>;
@@ -491,6 +492,72 @@ export default function EventDetails() {
           <Text style={[styles.deleteButtonText, { color: theme.danger }]}>Supprimer l'événement</Text>
         </TouchableOpacity>
       )}
+
+      {/* Confirmation Modals */}
+      <ConfirmModal
+        visible={showDeleteConfirm}
+        title="Supprimer l'événement"
+        message="Êtes-vous sûr de vouloir supprimer cet événement et tous les billets associés ? Cette action est irréversible."
+        onConfirm={executeDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        confirmText="Supprimer"
+        type="danger"
+      />
+
+      <ConfirmModal
+        visible={showExportInfo}
+        title="Information"
+        message="Aucun billet à exporter."
+        onConfirm={() => setShowExportInfo(false)}
+        onCancel={() => setShowExportInfo(false)}
+        confirmText="OK"
+        type="info"
+        showCancel={false}
+      />
+
+      <ConfirmModal
+        visible={showExportError}
+        title="Erreur"
+        message="Impossible de générer le PDF."
+        onConfirm={() => setShowExportError(false)}
+        onCancel={() => setShowExportError(false)}
+        confirmText="OK"
+        type="danger"
+        showCancel={false}
+      />
+
+      <ConfirmModal
+        visible={showSaveSuccess}
+        title="Succès"
+        message="Ajustements enregistrés."
+        onConfirm={() => setShowSaveSuccess(false)}
+        onCancel={() => setShowSaveSuccess(false)}
+        confirmText="OK"
+        type="success"
+        showCancel={false}
+      />
+
+      <ConfirmModal
+        visible={showSaveError}
+        title="Erreur"
+        message="Impossible d'enregistrer."
+        onConfirm={() => setShowSaveError(false)}
+        onCancel={() => setShowSaveError(false)}
+        confirmText="OK"
+        type="danger"
+        showCancel={false}
+      />
+
+      <ConfirmModal
+        visible={showDeleteError}
+        title="Erreur"
+        message="Impossible de supprimer l'événement."
+        onConfirm={() => setShowDeleteError(false)}
+        onCancel={() => setShowDeleteError(false)}
+        confirmText="OK"
+        type="danger"
+        showCancel={false}
+      />
     </ScrollView>
   );
 }

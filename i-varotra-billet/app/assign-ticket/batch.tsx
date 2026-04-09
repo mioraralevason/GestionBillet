@@ -1,10 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Modal, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Modal, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
 import { TicketService, Ticket } from '../../services/TicketService';
 import { BuyerService, Buyer } from '../../services/BuyerService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import ConfirmModal from '../../components/ConfirmModal';
+import { showSuccess, showError } from '../../utils/toast';
 
 export default function BatchAssign() {
   const { ids, eventId, mode } = useLocalSearchParams();
@@ -23,6 +25,9 @@ export default function BatchAssign() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
+
+  const [showActionError, setShowActionError] = useState(false);
+  const [actionErrorMessage, setActionErrorMessage] = useState('');
 
   useFocusEffect(useCallback(() => { 
     setBuyers(BuyerService.getBuyers()); 
@@ -74,7 +79,8 @@ export default function BatchAssign() {
 
   const handleAction = () => {
     if (!buyerName.trim()) {
-      Alert.alert('Erreur', 'Veuillez choisir un acheteur.');
+      setActionErrorMessage('Veuillez choisir un acheteur.');
+      setShowActionError(true);
       return;
     }
 
@@ -90,10 +96,10 @@ export default function BatchAssign() {
     };
 
     if (TicketService.updateTicketsBatch(data)) {
-      Alert.alert('Succès', 'Billets mis à jour avec succès.');
+      showSuccess('Billets mis à jour avec succès.');
       router.back();
     } else {
-      Alert.alert('Erreur', 'Impossible de mettre à jour les billets.');
+      showError('Impossible de mettre à jour les billets.');
     }
   };
 
@@ -263,6 +269,17 @@ export default function BatchAssign() {
               </View>
             </View>
           </Modal>
+
+          <ConfirmModal
+            visible={showActionError}
+            title="Erreur"
+            message={actionErrorMessage}
+            onConfirm={() => setShowActionError(false)}
+            onCancel={() => setShowActionError(false)}
+            confirmText="OK"
+            type="danger"
+            showCancel={false}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

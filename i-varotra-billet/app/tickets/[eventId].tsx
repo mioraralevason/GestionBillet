@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, Keyboard, Alert, useColorScheme, ScrollView } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, Keyboard, useColorScheme, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
 import { TicketService, Ticket } from '../../services/TicketService';
 import { EventService } from '../../services/EventService';
@@ -8,6 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../constants/theme';
 import { TicketCard } from '../../components/TicketCard';
 import { StatusBar } from 'expo-status-bar';
+import ConfirmModal from '../../components/ConfirmModal';
+import { showSuccess, showError } from '../../utils/toast';
 
 export default function TicketList() {
   const { eventId } = useLocalSearchParams();
@@ -37,6 +39,10 @@ export default function TicketList() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [showBatchResetModal, setShowBatchResetModal] = useState(false);
+  const [pendingResetTicket, setPendingResetTicket] = useState<Ticket | null>(null);
+
   const fetchTickets = useCallback(() => {
     const list = TicketService.getTicketsByEvent(id);
     setTickets(list);
@@ -58,51 +64,40 @@ export default function TicketList() {
   );
 
   const handleResetVerification = (ticket: Ticket) => {
-    Alert.alert(
-      'Réinitialiser la vérification',
-      `Voulez-vous vraiment annuler la validation du billet ${ticket.ticket_number} ? Il redeviendra "Vendu".`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { 
-          text: 'Réinitialiser', 
-          style: 'destructive',
-          onPress: () => {
-            if (TicketService.resetTicketVerification(ticket.id!)) {
-              fetchTickets();
-              Alert.alert('Succès', 'La vérification a été réinitialisée.');
-            } else {
-              Alert.alert('Erreur', 'Impossible de réinitialiser la vérification.');
-            }
-          }
-        }
-      ]
-    );
+    setPendingResetTicket(ticket);
+    setShowResetModal(true);
+  };
+
+  const confirmResetVerification = () => {
+    setShowResetModal(false);
+    if (!pendingResetTicket) return;
+
+    if (TicketService.resetTicketVerification(pendingResetTicket.id!)) {
+      fetchTickets();
+      showSuccess('Succès', 'La vérification a été réinitialisée.');
+    } else {
+      showError('Erreur', 'Impossible de réinitialiser la vérification.');
+    }
+    setPendingResetTicket(null);
   };
 
   const handleBatchResetVerification = () => {
     setShowMoreMenu(false);
     if (role !== 'admin' && role !== 'verificateur') return;
 
-    Alert.alert(
-      'Réinitialiser les vérifications',
-      `Voulez-vous vraiment annuler la validation des ${selectedIds.length} billets sélectionnés ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { 
-          text: 'Réinitialiser', 
-          style: 'destructive',
-          onPress: () => {
-            if (TicketService.resetTicketsVerificationBatch(selectedIds)) {
-              fetchTickets();
-              cancelSelection();
-              Alert.alert('Succès', 'Les vérifications ont été réinitialisées.');
-            } else {
-              Alert.alert('Erreur', 'Impossible de réinitialiser les vérifications.');
-            }
-          }
-        }
-      ]
-    );
+    setShowBatchResetModal(true);
+  };
+
+  const confirmBatchResetVerification = () => {
+    setShowBatchResetModal(false);
+
+    if (TicketService.resetTicketsVerificationBatch(selectedIds)) {
+      fetchTickets();
+      cancelSelection();
+      showSuccess('Succès', 'Les vérifications ont été réinitialisées.');
+    } else {
+      showError('Erreur', 'Impossible de réinitialiser les vérifications.');
+    }
   };
 
   const toggleSelection = (ticketId: number) => {
@@ -368,14 +363,36 @@ export default function TicketList() {
       />
 
       {selectionMode && role === 'admin' && (
-        <TouchableOpacity 
-          style={[styles.floatingPayBtn, { backgroundColor: theme.success }]} 
+        <TouchableOpacity
+          style={[styles.floatingPayBtn, { backgroundColor: theme.success }]}
           onPress={() => handleBatchAssign('pay')}
         >
           <MaterialCommunityIcons name="cash-check" size={28} color="#000" />
           <Text style={styles.floatingPayText}>PAYER ({selectedIds.length})</Text>
         </TouchableOpacity>
       )}
+
+      <ConfirmModal
+        visible={showResetModal}
+        title="Réinitialiser la vérification"
+        message={pendingResetTicket ? `Voulez-vous vraiment annuler la validation du billet ${pendingResetTicket.ticket_number} ? Il redeviendra "Vendu".` : ''}
+        onConfirm={confirmResetVerification}
+        onCancel={() => { setShowResetModal(false); setPendingResetTicket(null); }}
+        confirmText="Réinitialiser"
+        cancelText="Annuler"
+        type="danger"
+      />
+
+      <ConfirmModal
+        visible={showBatchResetModal}
+        title="Réinitialiser les vérifications"
+        message={`Voulez-vous vraiment annuler la validation des ${selectedIds.length} billets sélectionnés ?`}
+        onConfirm={confirmBatchResetVerification}
+        onCancel={() => setShowBatchResetModal(false)}
+        confirmText="Réinitialiser"
+        cancelText="Annuler"
+        type="danger"
+      />
     </SafeAreaView>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TextInput, Text, Alert, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Vibration, SafeAreaView } from 'react-native';
+import { View, TextInput, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Vibration, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserByPin } from '../database/database';
 import { useRouter } from 'expo-router';
@@ -7,9 +7,11 @@ import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function Login() {
   const [pin, setPin] = useState('');
+  const [showPinError, setShowPinError] = useState(false);
   const router = useRouter();
   const inputRef = useRef<TextInput>(null);
 
@@ -41,12 +43,7 @@ export default function Login() {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           Vibration.vibrate(400);
         }
-        Alert.alert('Accès refusé', 'Le code PIN est incorrect.', [
-          { text: 'Réessayer', onPress: () => {
-            setPin('');
-            inputRef.current?.focus();
-          }}
-        ]);
+        setShowPinError(true);
         setPin('');
       }
     });
@@ -116,6 +113,22 @@ export default function Login() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmModal
+        visible={showPinError}
+        title="Accès refusé"
+        message="Le code PIN est incorrect."
+        onConfirm={() => {
+          setShowPinError(false);
+          inputRef.current?.focus();
+        }}
+        onCancel={() => {
+          setShowPinError(false);
+          inputRef.current?.focus();
+        }}
+        confirmText="Réessayer"
+        type="danger"
+      />
     </SafeAreaView>
   );
 }

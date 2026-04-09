@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Modal, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Modal, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TicketService, Ticket } from '../../services/TicketService';
@@ -8,6 +8,8 @@ import { AttendanceService, ValidationResult } from '../../services/AttendanceSe
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
+import ConfirmModal from '../../components/ConfirmModal';
+import { showSuccess, showError, showWarning } from '../../utils/toast';
 
 export default function AssignTicket() {
   const { id } = useLocalSearchParams();
@@ -31,6 +33,13 @@ export default function AssignTicket() {
   const [showPayModal, setShowPayModal] = useState(false);
 
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+
+  // Confirmation modals state
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showCancelPaymentConfirm, setShowCancelPaymentConfirm] = useState(false);
+  const [showSaveError, setShowSaveError] = useState(false);
+  const [showPayAdjustment, setShowPayAdjustment] = useState(false);
+  const [adjustmentMessage, setAdjustmentMessage] = useState('');
 
   const fetchData = useCallback(async () => {
     const userRole = await AsyncStorage.getItem('userRole');
@@ -72,12 +81,12 @@ export default function AssignTicket() {
   const handleSave = (finalAmount?: string) => {
     if (!ticket) return;
     if (!buyerName) {
-      Alert.alert('Erreur', 'Veuillez sélectionner ou créer un acheteur.');
+      setShowSaveError(true);
       return;
     }
 
     const paid = parseFloat(finalAmount !== undefined ? finalAmount : amountPaid) || 0;
-    
+
     const success = TicketService.assignTicket(
       ticketId,
       buyerName.trim(),
@@ -86,10 +95,10 @@ export default function AssignTicket() {
     );
 
     if (success) {
-      Alert.alert('Succès', 'Opération effectuée avec succès.');
+      showSuccess('Opération effectuée avec succès.');
       fetchData(); // Rafraîchir les données pour afficher le nouveau statut
     } else {
-      Alert.alert('Erreur', 'Impossible d\'effectuer l\'opération.');
+      showError('Impossible d\'effectuer l\'opération.');
     }
   };
 
@@ -110,47 +119,31 @@ export default function AssignTicket() {
   };
 
   const handleResetVerification = (t: Ticket) => {
-    Alert.alert(
-      'Réinitialiser la vérification',
-      `Voulez-vous vraiment annuler la validation du billet ${t.ticket_number} ? Il redeviendra "Vendu".`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Réinitialiser',
-          style: 'destructive',
-          onPress: () => {
-            if (TicketService.resetTicketVerification(t.id!)) {
-              fetchData();
-              Alert.alert('Succès', 'La vérification a été réinitialisée.');
-            } else {
-              Alert.alert('Erreur', 'Impossible de réinitialiser la vérification.');
-            }
-          }
-        }
-      ]
-    );
+    setShowResetConfirm(true);
+  };
+
+  const executeResetVerification = () => {
+    setShowResetConfirm(false);
+    if (ticket && TicketService.resetTicketVerification(ticket.id!)) {
+      fetchData();
+      showSuccess('La vérification a été réinitialisée.');
+    } else {
+      showError('Impossible de réinitialiser la vérification.');
+    }
   };
 
   const handleCancelPayment = () => {
-    Alert.alert(
-      'Annuler les paiements',
-      'Voulez-vous vraiment supprimer TOUS les paiements associés à ce billet ?',
-      [
-        { text: 'Non', style: 'cancel' },
-        { 
-          text: 'Oui, annuler', 
-          style: 'destructive',
-          onPress: () => {
-            if (TicketService.cancelPayments(ticketId)) {
-              Alert.alert('Succès', 'Paiements annulés.');
-              fetchData();
-            } else {
-              Alert.alert('Erreur', 'Impossible d\'annuler les paiements.');
-            }
-          }
-        }
-      ]
-    );
+    setShowCancelPaymentConfirm(true);
+  };
+
+  const executeCancelPayment = () => {
+    setShowCancelPaymentConfirm(false);
+    if (TicketService.cancelPayments(ticketId)) {
+      showSuccess('Paiements annulés.');
+      fetchData();
+    } else {
+      showError('Impossible d\'annuler les paiements.');
+    }
   };
 
   if (!ticket) return <View style={styles.center}><Text style={{color: '#FFF'}}>Billet non trouvé</Text></View>;
@@ -381,13 +374,14 @@ export default function AssignTicket() {
                   <TouchableOpacity style={styles.btnCancel} onPress={() => setShowPayModal(false)}>
                     <Text style={styles.btnTextCancel}>Annuler</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.btnConfirm} 
+                  <TouchableOpacity
+                    style={styles.btnConfirm}
                     onPress={() => {
                       const remaining = ticket.price - (parseFloat(amountPaid) || 0);
                       const amount = parseFloat(tempAmount) || 0;
                       if (amount > remaining) {
-                        Alert.alert('Attention', `Le montant dépasse le reste à payer. Ajusté à ${remaining} Ar.`);
+                        setAdjustmentMessage(`Le montant dépasse le reste à payer. Ajusté à ${remaining} Ar.`);
+                        setShowPayAdjustment(true);
                         handleSave(remaining.toString());
                       } else {
                         handleSave(amount.toString());
@@ -433,6 +427,49 @@ export default function AssignTicket() {
               </View>
             </View>
           </Modal>
+
+          {/* ConfirmModal Components */}
+          <ConfirmModal
+            visible={showResetConfirm}
+            title="Réinitialiser la vérification"
+            message={`Voulez-vous vraiment annuler la validation du billet ${ticket?.ticket_number} ? Il redeviendra "Vendu".`}
+            onConfirm={executeResetVerification}
+            onCancel={() => setShowResetConfirm(false)}
+            confirmText="Réinitialiser"
+            type="warning"
+          />
+
+          <ConfirmModal
+            visible={showCancelPaymentConfirm}
+            title="Annuler les paiements"
+            message="Voulez-vous vraiment supprimer TOUS les paiements associés à ce billet ?"
+            onConfirm={executeCancelPayment}
+            onCancel={() => setShowCancelPaymentConfirm(false)}
+            confirmText="Oui, annuler"
+            type="danger"
+          />
+
+          <ConfirmModal
+            visible={showSaveError}
+            title="Erreur"
+            message="Veuillez sélectionner ou créer un acheteur."
+            onConfirm={() => setShowSaveError(false)}
+            onCancel={() => setShowSaveError(false)}
+            confirmText="OK"
+            type="danger"
+            showCancel={false}
+          />
+
+          <ConfirmModal
+            visible={showPayAdjustment}
+            title="Attention"
+            message={adjustmentMessage}
+            onConfirm={() => setShowPayAdjustment(false)}
+            onCancel={() => setShowPayAdjustment(false)}
+            confirmText="Compris"
+            type="warning"
+            showCancel={false}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

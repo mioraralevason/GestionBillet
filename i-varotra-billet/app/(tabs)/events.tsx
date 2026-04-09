@@ -1,6 +1,6 @@
 // app/(tabs)/events.tsx
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, TextInput, StatusBar, SafeAreaView, Dimensions, Keyboard } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, StatusBar, SafeAreaView, Dimensions, Keyboard } from 'react-native';
 import { EventService, Event } from '../../services/EventService';
 import { TicketService } from '../../services/TicketService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';

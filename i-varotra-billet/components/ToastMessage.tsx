@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
@@ -27,7 +28,7 @@ interface ToastMessageProps {
 
 const typeConfig = {
   success: {
-    icon: 'check-circle',
+    icon: 'trophy-variant',
     color: '#10B981',
     bgColor: 'rgba(16, 185, 129, 0.15)',
     borderColor: 'rgba(16, 185, 129, 0.3)',
@@ -62,15 +63,61 @@ const ToastMessage: React.FC<ToastMessageProps> = ({
 }) => {
   const translateY = useRef(new Animated.Value(-100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.9)).current;
+
+  const handleClose = () => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: -100,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scale, {
+        toValue: 0.9,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose?.();
+    });
+  };
 
   useEffect(() => {
     if (visible) {
+      // Play haptic feedback based on type
+      if (type === 'success') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else if (type === 'error') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      } else if (type === 'warning') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+
+      // Reset animations
+      translateY.setValue(-100);
+      opacity.setValue(0);
+      scale.setValue(0.9);
+
+      // Start animations
       Animated.parallel([
         Animated.spring(translateY, {
           toValue: 0,
           useNativeDriver: true,
           tension: 50,
-          friction: 7,
+          friction: 8,
+        }),
+        Animated.spring(scale, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 8,
         }),
         Animated.timing(opacity, {
           toValue: 1,
@@ -85,24 +132,7 @@ const ToastMessage: React.FC<ToastMessageProps> = ({
 
       return () => clearTimeout(timer);
     }
-  }, [visible]);
-
-  const handleClose = () => {
-    Animated.parallel([
-      Animated.timing(translateY, {
-        toValue: -100,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      onClose?.();
-    });
-  };
+  }, [visible, duration]);
 
   const config = typeConfig[type];
 
@@ -124,8 +154,10 @@ const ToastMessage: React.FC<ToastMessageProps> = ({
           style={[
             styles.container,
             {
-              transform: [{ translateY }],
+              transform: [{ translateY }, { scale }],
               opacity,
+              borderLeftColor: config.color,
+              shadowColor: config.color,
             },
           ]}
         >
@@ -164,32 +196,30 @@ const styles = StyleSheet.create({
   },
   container: {
     width: width * 0.9,
-    maxWidth: 400,
     backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#334155',
+    borderRadius: 12,
+    padding: 16,
+    borderLeftWidth: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
-    shadowRadius: 20,
+    shadowRadius: 16,
     elevation: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 15,
+    gap: 14,
   },
   closeButton: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 8,
+    right: 8,
     padding: 4,
     zIndex: 1,
   },
   iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
@@ -198,16 +228,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#F8FAFC',
-    marginBottom: 4,
     letterSpacing: 0.3,
   },
   message: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#94A3B8',
-    lineHeight: 20,
+    lineHeight: 18,
+    marginTop: 2,
   },
 });
 

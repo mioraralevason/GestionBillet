@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initDB } from '../database/database';
 
 import Toast from 'react-native-toast-message';
+import { toastConfig } from '../config/toastConfig';
 
 export default function Layout() {
   const [loading, setLoading] = useState(true);
@@ -104,7 +105,7 @@ export default function Layout() {
           }} 
         />
       </Stack>
-      <Toast />
+      <Toast config={toastConfig} />
     </>
   );
 }
