@@ -82,32 +82,33 @@ export const PdfService = {
           /* RECTO styles */
           .recto-top-section {
             width: 100%;
-            height: 48%;
+            height: 52%;
             background-color: ${themeColor};
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             padding: 3mm;
+            padding-top: 5mm;
           }
           .recto-slogan {
             font-size: 3pt;
             font-style: italic;
             color: #000;
             text-align: center;
-            margin-bottom: 2mm;
+            margin-bottom: 3mm;
             opacity: 0.8;
           }
           .recto-title {
-            font-size: 5pt;
+            font-size: 6pt;
             font-weight: bold;
             color: #000;
-            letter-spacing: 1mm;
-            margin-bottom: 2mm;
+            letter-spacing: 1.5mm;
+            margin-bottom: 3mm;
           }
           .recto-icon {
-            width: 12mm;
-            height: 12mm;
+            width: 14mm;
+            height: 14mm;
           }
           .recto-bottom-section {
             flex: 1;
@@ -116,37 +117,39 @@ export const PdfService = {
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 4mm;
-            border-top-left-radius: 25mm;
-            border-top-right-radius: 25mm;
-            margin-top: -10mm;
+            justify-content: space-around;
+            padding: 5mm;
+            border-top-left-radius: 30mm;
+            border-top-right-radius: 30mm;
+            margin-top: -18mm;
           }
           .recto-event-name {
-            font-size: 4pt;
+            font-size: 4.5pt;
             font-weight: bold;
             color: ${themeColor};
             text-transform: uppercase;
             margin-bottom: 1mm;
+            text-align: center;
           }
           .recto-event-date {
-            font-size: 3pt;
+            font-size: 3.2pt;
             color: #666;
             margin-bottom: 2mm;
           }
           .recto-num-box {
             background-color: #EEE;
-            padding: 1.5mm 4mm;
-            border-radius: 4mm;
-            margin-bottom: 3mm;
+            padding: 2mm 5mm;
+            border-radius: 5mm;
+            margin-bottom: 2mm;
           }
           .recto-num-text {
-            font-size: 3.5pt;
+            font-size: 3.8pt;
             font-weight: bold;
             color: #333;
           }
           .recto-qr-code {
-            width: 30mm;
-            height: 30mm;
+            width: 32mm;
+            height: 32mm;
           }
           
           /* VERSO styles */
