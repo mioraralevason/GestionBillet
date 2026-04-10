@@ -21,6 +21,8 @@ export const PdfService = {
 
     // Load logo for verso (convert to base64 for HTML usage)
     let logoUri = '';
+    let logoFallback = '<svg width="100%" height="100%" viewBox="0 0 200 200" style="background: rgba(0,0,0,0.05); border-radius: 10px;"><circle cx="100" cy="100" r="90" fill="none" stroke="#333" stroke-width="2"/><text x="100" y="110" font-size="40" font-weight="bold" text-anchor="middle" fill="#333">iBillet</text></svg>';
+    
     try {
       const logoAsset = Asset.fromModule(require('../assets/logo_iBillet.png'));
       await logoAsset.downloadAsync();
@@ -31,8 +33,10 @@ export const PdfService = {
         encoding: FileSystem.EncodingType.Base64,
       });
       logoUri = `data:image/png;base64,${base64}`;
+      console.log('Logo loaded successfully, size:', logoUri.length);
     } catch (e) {
       console.log('Logo loading error:', e);
+      logoUri = ''; // Will use fallback
     }
 
     // Load event image as base64 if present
@@ -82,33 +86,34 @@ export const PdfService = {
           /* RECTO styles */
           .recto-top-section {
             width: 100%;
-            height: 52%;
+            height: 50%;
             background-color: ${themeColor};
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
-            padding: 3mm;
-            padding-top: 5mm;
+            padding: 2mm;
+            padding-top: 3mm;
+            box-sizing: border-box;
           }
           .recto-slogan {
-            font-size: 3pt;
+            font-size: 2.5pt;
             font-style: italic;
             color: #000;
             text-align: center;
-            margin-bottom: 3mm;
+            margin-bottom: 2mm;
             opacity: 0.8;
           }
           .recto-title {
-            font-size: 6pt;
+            font-size: 5pt;
             font-weight: bold;
             color: #000;
-            letter-spacing: 1.5mm;
-            margin-bottom: 3mm;
+            letter-spacing: 1mm;
+            margin-bottom: 2mm;
           }
           .recto-icon {
-            width: 14mm;
-            height: 14mm;
+            width: 11mm;
+            height: 11mm;
           }
           .recto-bottom-section {
             flex: 1;
@@ -117,39 +122,41 @@ export const PdfService = {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: space-around;
-            padding: 5mm;
-            border-top-left-radius: 30mm;
-            border-top-right-radius: 30mm;
-            margin-top: -18mm;
+            justify-content: space-between;
+            padding: 3mm;
+            border-top-left-radius: 25mm;
+            border-top-right-radius: 25mm;
+            margin-top: -12mm;
+            box-sizing: border-box;
           }
           .recto-event-name {
-            font-size: 4.5pt;
+            font-size: 4pt;
             font-weight: bold;
             color: ${themeColor};
             text-transform: uppercase;
-            margin-bottom: 1mm;
+            margin-bottom: 0mm;
             text-align: center;
+            line-height: 1.1;
           }
           .recto-event-date {
-            font-size: 3.2pt;
+            font-size: 2.8pt;
             color: #666;
-            margin-bottom: 2mm;
+            margin-bottom: 1mm;
           }
           .recto-num-box {
             background-color: #EEE;
-            padding: 2mm 5mm;
-            border-radius: 5mm;
-            margin-bottom: 2mm;
+            padding: 1.5mm 4mm;
+            border-radius: 4mm;
+            margin-bottom: 1mm;
           }
           .recto-num-text {
-            font-size: 3.8pt;
+            font-size: 3.2pt;
             font-weight: bold;
             color: #333;
           }
           .recto-qr-code {
-            width: 32mm;
-            height: 32mm;
+            width: 28mm;
+            height: 28mm;
           }
           
           /* VERSO styles */
@@ -275,7 +282,7 @@ export const PdfService = {
                   <div class="verso-overlay"></div>
                 ` : ''}
                 <div class="verso-logo-container">
-                  ${logoUri ? `<img src="${logoUri}" class="verso-logo" />` : '<div style="font-size: 8pt; font-weight: bold; color: #666;">iBillet</div>'}
+                  ${logoUri ? `<img src="${logoUri}" class="verso-logo" />` : `${logoFallback}`}
                 </div>
                 ${event.description ? `
                   <div class="verso-description-container">
