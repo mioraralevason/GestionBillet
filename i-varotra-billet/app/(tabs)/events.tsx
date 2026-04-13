@@ -23,7 +23,44 @@ export default function EventsList() {
   const [eventToDelete, setEventToDelete] = useState<number | null>(null);
   const router = useRouter();
 
-  // ... (existing useEffect and callbacks)
+  // Fetch role
+  useEffect(() => {
+    const fetchRole = async () => {
+      const userRole = await AsyncStorage.getItem('userRole');
+      setRole(userRole);
+    };
+    fetchRole();
+  }, []);
+
+  // Fetch events
+  const fetchEvents = useCallback(async () => {
+    const allEvents = EventService.getEvents();
+    const eventsWithStats = allEvents.map(event => ({
+      ...event,
+      stats: TicketService.getEventStats(event.id!)
+    }));
+    setEvents(eventsWithStats);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchEvents();
+    }, [fetchEvents])
+  );
+
+  // Filter events based on search query
+  const filteredEvents = useMemo(() => {
+    if (!searchQuery.trim()) return events;
+    return events.filter(event =>
+      event.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [events, searchQuery]);
+
+  // Search suggestions
+  const suggestions = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    return filteredEvents.map(event => event.name).slice(0, 5);
+  }, [filteredEvents, searchQuery]);
 
   const handleDelete = (id: number) => {
     if (role !== 'admin') {
