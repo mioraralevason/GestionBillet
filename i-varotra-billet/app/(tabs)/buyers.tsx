@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BuyerService, Buyer } from '../../services/BuyerService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, Stack } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ConfirmModal from '../../components/ConfirmModal';
 import ToastMessage from '../../components/ToastMessage';
 
@@ -18,6 +19,7 @@ export default function BuyersList() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastConfig, setToastConfig] = useState<{ title: string; message?: string; type: 'success' | 'error' | 'warning' | 'info' }>({ title: '', type: 'info' });
+  const [role, setRole] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState('');
@@ -29,7 +31,15 @@ export default function BuyersList() {
     setBuyers(list);
   }, []);
 
-  useFocusEffect(useCallback(() => { fetchBuyers(); }, [fetchBuyers]));
+  const fetchRole = useCallback(async () => {
+    const userRole = await AsyncStorage.getItem('userRole');
+    setRole(userRole);
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    fetchBuyers();
+    fetchRole();
+  }, [fetchBuyers, fetchRole]));
 
   const filteredBuyers = useMemo(() => {
     if (!search.trim()) return buyers;
@@ -82,18 +92,22 @@ export default function BuyersList() {
         )}
       </View>
       <View style={styles.actions}>
-        <TouchableOpacity onPress={() => openModal(item)} style={styles.actionBtn}>
-          <MaterialCommunityIcons name="pencil" size={20} color="#6366F1" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
-            setBuyerToDelete(item);
-            setDeleteModalVisible(true);
-          }}
-          style={styles.actionBtn}
-        >
-          <MaterialCommunityIcons name="trash-can-outline" size={20} color="#EF4444" />
-        </TouchableOpacity>
+        {role !== 'verificateur' && (
+          <>
+            <TouchableOpacity onPress={() => openModal(item)} style={styles.actionBtn}>
+              <MaterialCommunityIcons name="pencil" size={20} color="#6366F1" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setBuyerToDelete(item);
+                setDeleteModalVisible(true);
+              }}
+              style={styles.actionBtn}
+            >
+              <MaterialCommunityIcons name="trash-can-outline" size={20} color="#EF4444" />
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
@@ -141,9 +155,11 @@ export default function BuyersList() {
         }
       />
 
-      <TouchableOpacity style={styles.fab} onPress={() => openModal()}>
-        <MaterialCommunityIcons name="account-plus" size={30} color="#000" />
-      </TouchableOpacity>
+      {role !== 'verificateur' && (
+        <TouchableOpacity style={styles.fab} onPress={() => openModal()}>
+          <MaterialCommunityIcons name="account-plus" size={30} color="#000" />
+        </TouchableOpacity>
+      )}
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
