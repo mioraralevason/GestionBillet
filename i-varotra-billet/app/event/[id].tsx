@@ -18,7 +18,6 @@ import { PdfService } from '../../services/PdfService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
-import Toast from 'react-native-toast-message';
 import { Colors } from '../../constants/theme';
 import ConfirmModal from '../../components/ConfirmModal';
 import { showSuccess, showError, showWarning, showInfo } from '../../utils/toast';
@@ -41,6 +40,7 @@ export default function EventDetails() {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [showExportConfirm, setShowExportConfirm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewSide, setPreviewSide] = useState<'recto' | 'verso'>('recto');
   const [isAdjusting, setIsAdjusting] = useState(false);
@@ -115,7 +115,14 @@ export default function EventDetails() {
    */
   const handleExportPdf = async () => {
     if (!event) return;
+
+    setShowExportConfirm(true);
+  };
+
+  const handleConfirmExport = async () => {
+    setShowExportConfirm(false);
     setExporting(true);
+
     const tickets = TicketService.getTicketsByEvent(eventId);
     if (tickets.length === 0) {
       setShowExportInfo(true);
@@ -509,13 +516,24 @@ export default function EventDetails() {
 
       <ConfirmModal
         visible={showExportInfo}
-        title="Information"
-        message="Aucun billet à exporter."
+        title="Aucun billet"
+        message="Aucun billet n'a été généré pour cet événement."
         onConfirm={() => setShowExportInfo(false)}
         onCancel={() => setShowExportInfo(false)}
         confirmText="OK"
         type="info"
         showCancel={false}
+      />
+
+      <ConfirmModal
+        visible={showExportConfirm}
+        title="Exporter les billets en PDF"
+        message={`Tous les billets de "${event?.name}" seront exportés dans un fichier PDF prêt à l'impression.`}
+        onConfirm={handleConfirmExport}
+        onCancel={() => setShowExportConfirm(false)}
+        confirmText="Exporter"
+        cancelText="Annuler"
+        type="primary"
       />
 
       <ConfirmModal

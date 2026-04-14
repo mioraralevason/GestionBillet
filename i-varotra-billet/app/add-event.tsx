@@ -11,11 +11,11 @@ import {
   Platform,
   Dimensions,
   Animated,
-  SafeAreaView,
   Modal,
   StatusBar,
   Image
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import ColorPicker from 'react-native-wheel-color-picker';

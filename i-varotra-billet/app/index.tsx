@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TextInput, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Vibration, SafeAreaView } from 'react-native';
+import { View, TextInput, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Vibration } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserByPin } from '../database/database';
 import { useRouter } from 'expo-router';

@@ -30,7 +30,7 @@ export const PdfService = {
       
       // Use FileSystem to read as base64
       const base64 = await FileSystem.readAsStringAsync(localUri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: 'base64',
       });
       logoUri = `data:image/png;base64,${base64}`;
       console.log('Logo loaded successfully, size:', logoUri.length);
