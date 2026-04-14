@@ -18,6 +18,7 @@ import { PdfService } from '../../services/PdfService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
+import Toast from 'react-native-toast-message';
 import { Colors } from '../../constants/theme';
 import ConfirmModal from '../../components/ConfirmModal';
 import { showSuccess, showError, showWarning, showInfo } from '../../utils/toast';
@@ -125,6 +126,8 @@ export default function EventDetails() {
     const success = await PdfService.exportTicketsToPdf(event, tickets);
     if (!success) {
       setShowExportError(true);
+    } else {
+      showSuccess('PDF exporté avec succès');
     }
     setExporting(false);
   };
@@ -215,16 +218,16 @@ export default function EventDetails() {
           <View style={styles.financeRow}>
             <View style={styles.financeItem}>
               <Text style={[styles.financeLabel, { color: theme.icon }]}>Encaissé</Text>
-              <Text style={[styles.financeValue, { color: theme.success }]}>{stats.total_collected.toLocaleString()} Ar</Text>
+              <Text style={[styles.financeValue, { color: theme.success }]}>{(stats.total_collected ?? 0).toLocaleString()} Ar</Text>
             </View>
             <View style={styles.financeItem}>
               <Text style={[styles.financeLabel, { color: theme.icon }]}>Reste</Text>
-              <Text style={[styles.financeValue, { color: theme.danger }]}>{stats.total_pending.toLocaleString()} Ar</Text>
+              <Text style={[styles.financeValue, { color: theme.danger }]}>{(stats.total_pending ?? 0).toLocaleString()} Ar</Text>
             </View>
           </View>
           <View style={[styles.financeItem, { marginTop: 15, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 10 }]}>
             <Text style={[styles.financeLabel, { color: theme.icon }]}>Chiffre d'affaires total prévu</Text>
-            <Text style={[styles.financeValue, { fontSize: 20, color: themeColor }]}>{stats.total_potential_revenue.toLocaleString()} Ar</Text>
+            <Text style={[styles.financeValue, { fontSize: 20, color: themeColor }]}>{(stats.total_potential_revenue ?? 0).toLocaleString()} Ar</Text>
           </View>
         </View>
       )}
@@ -236,7 +239,7 @@ export default function EventDetails() {
             <View key={type.id} style={[styles.ticketTypeRow, index < ticketTypes.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: 10, marginBottom: 10 }]}>
               <View style={styles.ticketTypeInfo}>
                 <Text style={[styles.ticketTypeName, { color: themeColor }]}>{type.name}</Text>
-                <Text style={[styles.ticketTypePrice, { color: theme.icon }]}>{type.price.toLocaleString()} Ar</Text>
+                <Text style={[styles.ticketTypePrice, { color: theme.icon }]}>{(type.price ?? 0).toLocaleString()} Ar</Text>
               </View>
               <View style={styles.ticketTypeStats}>
                 <View style={styles.ticketTypeStatItem}>

@@ -12,8 +12,17 @@ import {
   Dimensions,
   Animated,
   SafeAreaView,
-  Modal
+  Modal,
+  StatusBar,
+  Image
 } from 'react-native';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import ColorPicker from 'react-native-wheel-color-picker';
+import * as ImagePicker from 'expo-image-picker';
+import { EventService } from '../services/EventService';
+import { TicketService } from '../services/TicketService';
+import db from '../database/database';
 import Toast from 'react-native-toast-message';
 
 // ... (existing imports)

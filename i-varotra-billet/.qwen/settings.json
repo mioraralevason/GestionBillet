@@ -3,7 +3,16 @@
     "allow": [
       "Bash(npx *)",
       "Bash(mv *)",
-      "Bash(mkdir *)"
+      "Bash(mkdir *)",
+      "Bash(du *)",
+      "Bash(find *)",
+      "Bash(rm *)",
+      "Bash(ls *)",
+      "Bash(which *)",
+      "Bash(sudo *)",
+      "Bash(npm *)",
+      "Bash(node *)",
+      "Bash(xargs *)"
     ]
   },
   "$version": 3

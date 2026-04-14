@@ -126,7 +126,7 @@ export default function GenerateTickets() {
               <View key={type.id} style={[styles.ticketTypeRow, { backgroundColor: theme.background, borderColor: theme.border }]}>
                 <View style={styles.ticketTypeInfo}>
                   <Text style={[styles.ticketTypeName, { color: theme.text }]}>{type.name}</Text>
-                  <Text style={[styles.ticketTypePrice, { color: themeColor }]}>{type.price.toLocaleString()} Ar</Text>
+                  <Text style={[styles.ticketTypePrice, { color: themeColor }]}>{(type.price ?? 0).toLocaleString()} Ar</Text>
                 </View>
                 <View style={styles.generateRow}>
                   <TextInput
