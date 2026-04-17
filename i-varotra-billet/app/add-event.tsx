@@ -20,6 +20,7 @@ import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import ColorPicker from 'react-native-wheel-color-picker';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { EventService } from '../services/EventService';
 import { TicketService } from '../services/TicketService';
 import db from '../database/database';

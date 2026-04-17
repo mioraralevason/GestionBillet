@@ -206,9 +206,11 @@ export default function EventsList() {
         />
       )}
       
-      <TouchableOpacity style={styles.fab} onPress={() => router.push('/add-event')}>
-        <MaterialCommunityIcons name="plus" size={30} color="#000" />
-      </TouchableOpacity>
+      {role !== 'verificateur' && (
+        <TouchableOpacity style={styles.fab} onPress={() => router.push('/add-event')}>
+          <MaterialCommunityIcons name="plus" size={30} color="#000" />
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
