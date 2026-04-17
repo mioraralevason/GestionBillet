@@ -440,11 +440,8 @@ export default function EventDetails() {
                   </View>
                 )}
 
-                {/* Footer avec copyright et téléphone */}
-                <View style={styles.versoFooter}>
-                  <Text style={styles.versoFooterText}>© 2026 iBillet - Tous droits réservés</Text>
-                  <Text style={styles.versoFooterText}>📞 033 76 913 14</Text>
-                </View>
+                {/* Footer removed for preview */}
+                <View style={styles.versoFooter} />
               </View>
             </View>
 

@@ -39,23 +39,10 @@ export const PdfService = {
       logoUri = ''; // Will use fallback
     }
 
-    // Load event image as base64 if present
+    // Use event image URL directly (avoid inlining large images which can cause OOM)
     let eventImageUri = '';
     if (event.image) {
-      try {
-        const response = await fetch(event.image);
-        const blob = await response.blob();
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        eventImageUri = base64;
-      } catch (e) {
-        console.log('Event image loading error:', e);
-        eventImageUri = event.image; // Fallback to original URL
-      }
+      eventImageUri = event.image as string;
     }
 
     let htmlContent = `
@@ -175,15 +162,7 @@ export const PdfService = {
             object-fit: cover;
             transform: scale(${event.img_scale || 1.0}) rotate(${event.img_rotate || 0}deg) translate(${event.img_x || 0}px, ${event.img_y || 0}px);
           }
-          .verso-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255,255,255,0.7);
-            z-index: 2;
-          }
+          .verso-overlay { display: none; }
           .verso-logo-container {
             position: absolute;
             top: 50%;
@@ -279,7 +258,6 @@ export const PdfService = {
                   <div class="verso-image-container">
                     <img src="${eventImageUri}" class="verso-image" />
                   </div>
-                  <div class="verso-overlay"></div>
                 ` : ''}
                 <div class="verso-logo-container">
                   ${logoUri ? `<img src="${logoUri}" class="verso-logo" />` : `${logoFallback}`}
@@ -289,10 +267,7 @@ export const PdfService = {
                     <div class="verso-description">${event.description}</div>
                   </div>
                 ` : ''}
-                <div class="verso-footer">
-                  <div class="verso-footer-text">© 2026 iBillet - Tous droits réservés</div>
-                  <div class="verso-footer-text">📞 033 76 913 14</div>
-                </div>
+                <div class="verso-footer"></div>
               </div>
             `;
           } else {

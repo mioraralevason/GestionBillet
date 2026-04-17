@@ -449,12 +449,12 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, marginLeft: 10, fontSize: 16 },
   suggestionsList: { 
     position: 'absolute', 
-    top: 75, 
+    top: 120, 
     left: 15, 
     right: 15, 
     borderRadius: 10, 
-    elevation: 5, 
-    zIndex: 100, 
+    elevation: 8, 
+    zIndex: 2000, 
     borderWidth: 1, 
     maxHeight: 250
   },

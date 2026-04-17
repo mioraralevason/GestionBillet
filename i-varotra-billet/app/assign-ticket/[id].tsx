@@ -86,7 +86,7 @@ export default function AssignTicket() {
       return;
     }
 
-    const paid = parseFloat(finalAmount !== undefined ? finalAmount : amountPaid) || 0;
+    const paid = finalAmount !== undefined ? (parseFloat(finalAmount) || 0) : 0;
 
     const success = TicketService.assignTicket(
       ticketId,

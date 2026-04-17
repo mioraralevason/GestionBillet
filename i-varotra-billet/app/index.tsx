@@ -109,7 +109,6 @@ export default function Login() {
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>© 2026 iBillet</Text>
-              <Text style={[styles.footerSubtext, { color: '#94A3B8', marginTop: 5, fontWeight: '600' }]}>033 76 913 14</Text>
             </View>
           </View>
         </ScrollView>
