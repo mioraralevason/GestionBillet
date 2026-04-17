@@ -469,6 +469,7 @@ export default function EventDetails() {
               </View>
             </View>
 
+            {/* Adjustment Controls - Displayed below ticket */}
             {previewSide === 'verso' && event?.image && role === 'admin' && (
               <View style={styles.adjustmentControls}>
                 {!isAdjusting ? (
@@ -496,7 +497,7 @@ export default function EventDetails() {
                       </View>
                       <TouchableOpacity onPress={() => setImgY(y => y + 5)}><MaterialCommunityIcons name="chevron-down" size={24} color={theme.icon} /></TouchableOpacity>
                     </View>
-                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={styles.controlButtonsRow}>
                       <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#64748B' }]} onPress={() => { setIsAdjusting(false); fetchData(); }}>
                         <Text style={[styles.actionBtnText, { color: '#000' }]}>Annuler</Text>
                       </TouchableOpacity>
@@ -752,13 +753,14 @@ const styles = StyleSheet.create({
   versoFooter: { position: 'absolute', bottom: 15, left: 0, right: 0, alignItems: 'center', gap: 4 },
   versoFooterText: { fontSize: 10, color: '#999', textAlign: 'center' },
   previewHint: { fontSize: 12, textAlign: 'center', fontStyle: 'italic' },
-  adjustmentControls: { marginTop: 10, width: '100%' },
-  controlBtn: { flexDirection: 'row', padding: 10, borderRadius: 10, justifyContent: 'center', alignItems: 'center', gap: 8 },
+  adjustmentControls: { marginTop: 15, width: '100%', paddingHorizontal: 0 },
+  controlBtn: { flexDirection: 'row', padding: 12, borderRadius: 10, justifyContent: 'center', alignItems: 'center', gap: 8, width: '100%' },
   controlBtnText: { fontWeight: 'bold' },
-  adjustmentPanel: { borderRadius: 12, padding: 15, borderWidth: 1 },
-  controlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  controlLabel: { fontSize: 14, fontWeight: '600' },
-  moveControls: { alignItems: 'center', marginVertical: 10 },
+  adjustmentPanel: { borderRadius: 12, padding: 15, borderWidth: 1, gap: 12 },
+  controlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  controlLabel: { fontSize: 13, fontWeight: '600' },
+  moveControls: { alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
+  controlButtonsRow: { flexDirection: 'row', gap: 10, paddingTop: 10, borderTopWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
   actionBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
   actionBtnText: { fontWeight: 'bold' },
   deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1 },
