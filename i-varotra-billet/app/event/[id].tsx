@@ -14,7 +14,7 @@ import {
 import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
 import { EventService, Event } from '../../services/EventService';
 import { TicketService } from '../../services/TicketService';
-import { PdfService } from '../../services/PdfService';
+import { PdfService, PdfExportOptions } from '../../services/PdfService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
@@ -51,6 +51,12 @@ export default function EventDetails() {
   const [imgX, setImgX] = useState(0);
   const [imgY, setImgY] = useState(0);
   const [isClearMode, setIsClearMode] = useState(false);
+
+  // PDF Export options
+  const [showExportOptions, setShowExportOptions] = useState(false);
+  const [exportTicketTypeId, setExportTicketTypeId] = useState<number | null>(null);
+  const [exportFromNumber, setExportFromNumber] = useState('');
+  const [exportToNumber, setExportToNumber] = useState('');
 
   // Confirmation modals
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -115,28 +121,46 @@ export default function EventDetails() {
    */
   const handleExportPdf = async () => {
     if (!event) return;
-
-    setShowExportConfirm(true);
+    setShowExportOptions(true);
   };
 
   const handleConfirmExport = async () => {
+    setShowExportOptions(false);
+    setShowExportConfirm(true);
+  };
+
+  const handleDoExport = async () => {
     setShowExportConfirm(false);
     setExporting(true);
 
-    const tickets = TicketService.getTicketsByEvent(eventId);
-    if (tickets.length === 0) {
+    const allTickets = TicketService.getTicketsByEvent(eventId);
+    if (allTickets.length === 0) {
       setShowExportInfo(true);
       setExporting(false);
       return;
     }
 
-    const success = await PdfService.exportTicketsToPdf(event, tickets);
+    const options: PdfExportOptions = {};
+    if (exportTicketTypeId) {
+      options.ticketTypeId = exportTicketTypeId;
+    }
+    if (exportFromNumber) {
+      options.fromNumber = parseInt(exportFromNumber);
+    }
+    if (exportToNumber) {
+      options.toNumber = parseInt(exportToNumber);
+    }
+
+    const success = await PdfService.exportTicketsToPdf(event, allTickets, options);
     if (!success) {
       setShowExportError(true);
     } else {
       showSuccess('PDF exporté avec succès');
     }
     setExporting(false);
+    setExportTicketTypeId(null);
+    setExportFromNumber('');
+    setExportToNumber('');
   };
 
   /**
@@ -522,11 +546,94 @@ export default function EventDetails() {
         showCancel={false}
       />
 
+      {/* PDF Export Options Modal */}
+      <Modal
+        visible={showExportOptions}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowExportOptions(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Options d'export PDF</Text>
+            
+            <Text style={[styles.label, { color: theme.text }]}>Type de billet (optionnel)</Text>
+            <View style={styles.typeSelector}>
+              <TouchableOpacity
+                style={[
+                  styles.typeButton,
+                  !exportTicketTypeId && { backgroundColor: themeColor, borderColor: themeColor }
+                ]}
+                onPress={() => setExportTicketTypeId(null)}
+              >
+                <Text style={[styles.typeButtonText, !exportTicketTypeId && { color: '#FFF' }]}>Tous</Text>
+              </TouchableOpacity>
+              {ticketTypes.map(type => (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[
+                    styles.typeButton,
+                    exportTicketTypeId === type.id && { backgroundColor: themeColor, borderColor: themeColor }
+                  ]}
+                  onPress={() => setExportTicketTypeId(type.id)}
+                >
+                  <Text style={[
+                    styles.typeButtonText,
+                    exportTicketTypeId === type.id && { color: '#FFF' }
+                  ]}>{type.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={[styles.label, { color: theme.text }]}>Numéro de billet (optionnel)</Text>
+            <View style={styles.numberRange}>
+              <TextInput
+                style={[styles.numberInput, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }]}
+                placeholder="Du n°"
+                placeholderTextColor={theme.tabIconDefault}
+                value={exportFromNumber}
+                onChangeText={setExportFromNumber}
+                keyboardType="numeric"
+              />
+              <Text style={{ color: theme.text }}>à</Text>
+              <TextInput
+                style={[styles.numberInput, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }]}
+                placeholder="Au n°"
+                placeholderTextColor={theme.tabIconDefault}
+                value={exportToNumber}
+                onChangeText={setExportToNumber}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.cancelButton, { borderColor: theme.border }]}
+                onPress={() => {
+                  setShowExportOptions(false);
+                  setExportTicketTypeId(null);
+                  setExportFromNumber('');
+                  setExportToNumber('');
+                }}
+              >
+                <Text style={{ color: theme.text }}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmButton, { backgroundColor: themeColor }]}
+                onPress={handleConfirmExport}
+              >
+                <Text style={styles.confirmButtonText}>Continuer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <ConfirmModal
         visible={showExportConfirm}
         title="Exporter les billets en PDF"
-        message={`Tous les billets de "${event?.name}" seront exportés dans un fichier PDF prêt à l'impression.`}
-        onConfirm={handleConfirmExport}
+        message={`Les billets seront exportés selon les critères sélectionnés.`}
+        onConfirm={handleDoExport}
         onCancel={() => setShowExportConfirm(false)}
         confirmText="Exporter"
         cancelText="Annuler"
@@ -655,5 +762,18 @@ const styles = StyleSheet.create({
   actionBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
   actionBtnText: { fontWeight: 'bold' },
   deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1 },
-  deleteButtonText: { fontWeight: 'bold' }
+  deleteButtonText: { fontWeight: 'bold' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '85%', padding: 20, borderRadius: 12, elevation: 5 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  label: { fontSize: 14, fontWeight: '600', marginTop: 15, marginBottom: 8 },
+  typeSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  typeButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#CCC' },
+  typeButtonText: { fontSize: 13 },
+  numberRange: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  numberInput: { flex: 1, padding: 10, borderRadius: 8, borderWidth: 1 },
+  modalButtons: { flexDirection: 'row', marginTop: 25, gap: 12 },
+  cancelButton: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center', borderWidth: 1 },
+  confirmButton: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
+  confirmButtonText: { color: '#FFF', fontWeight: 'bold' }
 });

@@ -5,52 +5,72 @@ import { Ticket } from './TicketService';
 import { Event } from './EventService';
 import * as FileSystem from 'expo-file-system';
 
-/**
- * Service handling PDF generation and sharing for tickets.
- */
-export const PdfService = {
-  /**
-   * Generates a PDF file containing printable tickets with Recto/Verso layout.
-   * The layout is designed for A4 paper with a 3x3 grid (9 tickets per page).
-   * @param {Event} event - The event data to display on tickets.
-   * @param {Ticket[]} tickets - The list of tickets to generate.
-   * @returns {Promise<boolean>} True if the PDF was generated and shared successfully.
-   */
-  exportTicketsToPdf: async (event: Event, tickets: Ticket[]) => {
-    const themeColor = event.color || '#007AFF';
+export interface PdfExportOptions {
+  ticketTypeId?: number;
+  fromNumber?: number;
+  toNumber?: number;
+}
 
-    // Load logo for verso (convert to base64 for HTML usage)
+const extractNumber = (ticketNum: string | undefined): number => {
+  if (!ticketNum) return 0;
+  const lastDash = ticketNum.lastIndexOf('-');
+  const lastUnderscore = ticketNum.lastIndexOf('_');
+  const lastSeparator = Math.max(lastDash, lastUnderscore);
+  if (lastSeparator === -1) return 0;
+  const numStr = ticketNum.substring(lastSeparator + 1);
+  return parseInt(numStr, 10);
+};
+
+export const PdfService = {
+  exportTicketsToPdf: async (event: Event, tickets: Ticket[], options?: PdfExportOptions) => {
+    let filteredTickets = [...tickets];
+    
+    if (filteredTickets.length === 0) {
+      console.error('No tickets to export!');
+      return false;
+    }
+
+    const safeEvent = {
+      name: event?.name || 'ÉVÉNEMENT',
+      event_date: event?.event_date || '',
+      slogan: event?.slogan || '',
+      description: event?.description || '',
+      color: event?.color || '#007AFF',
+      img_scale: event?.img_scale || 1.0,
+      img_rotate: event?.img_rotate || 0,
+      img_x: event?.img_x || 0,
+      img_y: event?.img_y || 0,
+    };
+
+    const themeColor = safeEvent.color;
+
+    // Load logo as base64
     let logoUri = '';
-    let logoFallback = '<svg width="100%" height="100%" viewBox="0 0 200 200" style="background: rgba(0,0,0,0.05); border-radius: 10px;"><circle cx="100" cy="100" r="90" fill="none" stroke="#333" stroke-width="2"/><text x="100" y="110" font-size="40" font-weight="bold" text-anchor="middle" fill="#333">iBillet</text></svg>';
+    const logoFallback = '<svg width="100%" height="100%" viewBox="0 0 200 200"><circle cx="100" cy="100" r="90" fill="none" stroke="#333" stroke-width="8"/><text x="100" y="115" font-size="50" font-weight="bold" text-anchor="middle" fill="#333">iBillet</text></svg>';
     
     try {
       const logoAsset = Asset.fromModule(require('../assets/logo_iBillet.png'));
       await logoAsset.downloadAsync();
       const localUri = logoAsset.localUri || logoAsset.uri;
-      
-      // Use FileSystem to read as base64
-      const base64 = await FileSystem.readAsStringAsync(localUri, {
-        encoding: 'base64',
-      });
+      const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: 'base64' });
       logoUri = `data:image/png;base64,${base64}`;
-      console.log('Logo loaded successfully, size:', logoUri.length);
+      console.log('Logo loaded successfully');
     } catch (e) {
-      console.log('Logo loading error:', e);
-      logoUri = ''; // Will use fallback
+      console.log('Logo loading error, using fallback:', e);
     }
 
-    // Use event image URL directly (avoid inlining large images which can cause OOM)
     let eventImageUri = '';
-    if (event.image) {
-      eventImageUri = event.image as string;
+    if (event?.image && !event.image.startsWith('data:') && event.image.startsWith('http')) {
+      eventImageUri = event.image;
     }
 
-    let htmlContent = `
+    let htmlContent = `<!DOCTYPE html>
       <html>
       <head>
+        <meta charset="utf-8">
         <style>
           @page { margin: 0; size: A4; }
-          body { margin: 0; font-family: 'Helvetica', 'Arial', sans-serif; }
+          body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Helvetica', 'Arial', sans-serif; }
           .page {
             width: 210mm;
             height: 297mm;
@@ -62,91 +82,103 @@ export const PdfService = {
           .ticket {
             width: 70mm;
             height: 99mm;
-            box-sizing: border-box;
-            border: 0.1mm dashed #CCC;
+            border-radius: 2.24mm;
             overflow: hidden;
             position: relative;
+            background-color: #FFF;
+            border: 0.5mm dashed #CCCCCC;
+            box-sizing: border-box;
           }
-          .ticket-recto { background-color: #FFF; }
-          .ticket-verso { background-color: #FFF; }
           
-          /* RECTO styles */
           .recto-top-section {
             width: 100%;
-            height: 50%;
+            height: 52%;
             background-color: ${themeColor};
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
-            padding: 2mm;
-            padding-top: 3mm;
+            padding-top: 4.2mm;
             box-sizing: border-box;
           }
           .recto-slogan {
-            font-size: 2.5pt;
+            font-size: 2.4mm;
             font-style: italic;
             color: #000;
             text-align: center;
-            margin-bottom: 2mm;
+            margin-bottom: 1.8mm;
+            padding: 0 2.8mm;
             opacity: 0.8;
           }
+          .recto-top-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+          }
           .recto-title {
-            font-size: 5pt;
+            font-size: 4mm;
             font-weight: bold;
             color: #000;
-            letter-spacing: 1mm;
-            margin-bottom: 2mm;
+            margin-bottom: 1.2mm;
+            letter-spacing: 0.56mm;
           }
           .recto-icon {
-            width: 11mm;
-            height: 11mm;
+            width: 10mm;
+            height: 10mm;
           }
           .recto-bottom-section {
             flex: 1;
             width: 100%;
-            background-color: #FFF;
             display: flex;
             flex-direction: column;
+            padding: 4.2mm;
+            padding-top: 4.2mm;
+            padding-bottom: 4.2mm;
             align-items: center;
-            justify-content: space-between;
-            padding: 3mm;
-            border-top-left-radius: 25mm;
-            border-top-right-radius: 25mm;
-            margin-top: -12mm;
+            justify-content: space-around;
+            border-top-left-radius: 22.4mm;
+            border-top-right-radius: 22.4mm;
+            margin-top: -16.8mm;
             box-sizing: border-box;
+            position: relative;
+            z-index: 1;
+            background-color: #FFF;
           }
           .recto-event-name {
-            font-size: 4pt;
+            font-size: 3.5mm;
             font-weight: bold;
             color: ${themeColor};
             text-transform: uppercase;
-            margin-bottom: 0mm;
             text-align: center;
             line-height: 1.1;
           }
           .recto-event-date {
-            font-size: 2.8pt;
+            font-size: 2.8mm;
+            margin-top: 1.4mm;
             color: #666;
-            margin-bottom: 1mm;
           }
           .recto-num-box {
             background-color: #EEE;
-            padding: 1.5mm 4mm;
-            border-radius: 4mm;
-            margin-bottom: 1mm;
+            padding: 1.4mm 2.8mm;
+            border-radius: 4.2mm;
           }
           .recto-num-text {
-            font-size: 3.2pt;
+            font-size: 2.8mm;
             font-weight: bold;
             color: #333;
           }
           .recto-qr-code {
-            width: 28mm;
-            height: 28mm;
+            width: 18mm;
+            height: 18mm;
           }
           
-          /* VERSO styles */
+          .ticket-verso {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          
           .verso-image-container {
             position: absolute;
             top: 0;
@@ -160,9 +192,17 @@ export const PdfService = {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scale(${event.img_scale || 1.0}) rotate(${event.img_rotate || 0}deg) translate(${event.img_x || 0}px, ${event.img_y || 0}px);
+            transform: scale(${safeEvent.img_scale}) rotate(${safeEvent.img_rotate}deg) translate(${safeEvent.img_x}px, ${safeEvent.img_y}px);
           }
-          .verso-overlay { display: none; }
+          .verso-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255,255,255,0.7);
+            z-index: 2;
+          }
           .verso-logo-container {
             position: absolute;
             top: 50%;
@@ -174,62 +214,51 @@ export const PdfService = {
             align-items: center;
           }
           .verso-logo {
-            width: 34mm;
-            height: 34mm;
+            width: 28mm;
+            height: 28mm;
+            object-fit: contain;
           }
           .verso-description-container {
             position: absolute;
-            bottom: 15mm;
-            left: 0;
-            right: 0;
-            padding: 0 5mm;
+            bottom: 14mm;
+            left: 2.8mm;
+            right: 2.8mm;
             z-index: 10;
+            text-align: center;
           }
           .verso-description {
-            font-size: 4pt;
+            font-size: 2.4mm;
             color: #333;
             text-align: center;
             font-style: italic;
             line-height: 1.4;
-          }
-          .verso-footer {
-            position: absolute;
-            bottom: 3mm;
-            left: 0;
-            right: 0;
-            text-align: center;
-            z-index: 10;
-          }
-          .verso-footer-text {
-            font-size: 3pt;
-            color: #666;
-            margin: 0.5mm 0;
           }
         </style>
       </head>
       <body>
     `;
 
-    for (let i = 0; i < tickets.length; i += 9) {
-      const chunk = tickets.slice(i, i + 9);
+    for (let i = 0; i < filteredTickets.length; i += 9) {
+      const chunk = filteredTickets.slice(i, i + 9);
 
-      // Page RECTO
       htmlContent += '<div class="page">';
       chunk.forEach(t => {
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(t.qr_code)}`;
         htmlContent += `
-          <div class="ticket ticket-recto">
+          <div class="ticket">
             <div class="recto-top-section">
-              ${event.slogan ? `<div class="recto-slogan">${event.slogan}</div>` : ''}
-              <div class="recto-title">BILLET</div>
-              <svg class="recto-icon" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2">
-                <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
-                <path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
-              </svg>
+              ${safeEvent.slogan ? `<div class="recto-slogan">${safeEvent.slogan}</div>` : ''}
+              <div class="recto-top-content">
+                <div class="recto-title">BILLET</div>
+                <svg class="recto-icon" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2">
+                  <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+                  <path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
+                </svg>
+              </div>
             </div>
             <div class="recto-bottom-section">
-              <div class="recto-event-name">${event.name || 'ÉVÉNEMENT'}</div>
-              <div class="recto-event-date">${event.event_date}</div>
+              <div class="recto-event-name">${safeEvent.name}</div>
+              <div class="recto-event-date">${safeEvent.event_date}</div>
               <div class="recto-num-box">
                 <div class="recto-num-text">${t.ticket_number}</div>
               </div>
@@ -243,37 +272,29 @@ export const PdfService = {
       }
       htmlContent += '</div>';
 
-      // Page VERSO
       htmlContent += '<div class="page">';
-      for (let row = 0; row < 3; row++) {
-        const rowTickets = chunk.slice(row * 3, row * 3 + 3);
-        const fullRow = [...rowTickets];
-        while (fullRow.length < 3) fullRow.push(null as any);
-
-        fullRow.reverse().forEach(t => {
-          if (t) {
-            htmlContent += `
-              <div class="ticket ticket-verso">
-                ${eventImageUri ? `
-                  <div class="verso-image-container">
-                    <img src="${eventImageUri}" class="verso-image" />
-                  </div>
-                ` : ''}
-                <div class="verso-logo-container">
-                  ${logoUri ? `<img src="${logoUri}" class="verso-logo" />` : `${logoFallback}`}
-                </div>
-                ${event.description ? `
-                  <div class="verso-description-container">
-                    <div class="verso-description">${event.description}</div>
-                  </div>
-                ` : ''}
-                <div class="verso-footer"></div>
+      chunk.forEach(t => {
+        htmlContent += `
+          <div class="ticket ticket-verso">
+            ${eventImageUri ? `
+              <div class="verso-image-container">
+                <img src="${eventImageUri}" class="verso-image" />
               </div>
-            `;
-          } else {
-            htmlContent += '<div class="ticket"></div>';
-          }
-        });
+              <div class="verso-overlay"></div>
+            ` : ''}
+            <div class="verso-logo-container">
+              ${logoUri ? `<img src="${logoUri}" class="verso-logo" />` : `${logoFallback}`}
+            </div>
+            ${safeEvent.description ? `
+              <div class="verso-description-container">
+                <div class="verso-description">${safeEvent.description}</div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      });
+      for (let j = chunk.length; j < 9; j++) {
+        htmlContent += '<div class="ticket"></div>';
       }
       htmlContent += '</div>';
     }
@@ -281,14 +302,11 @@ export const PdfService = {
     htmlContent += '</body></html>';
 
     try {
-      console.log('Generating PDF with', tickets.length, 'tickets');
-      console.log('Logo URI length:', logoUri.length);
-      console.log('Event image URI length:', eventImageUri ? eventImageUri.length : 0);
+      console.log('Generating PDF with', filteredTickets.length, 'tickets');
+      const result = await Print.printToFileAsync({ html: htmlContent });
+      console.log('PDF generated at:', result.uri);
       
-      const { uri } = await Print.printToFileAsync({ html: htmlContent });
-      console.log('PDF generated at:', uri);
-      
-      await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+      await Sharing.shareAsync(result.uri, { UTI: '.pdf', mimeType: 'application/pdf' });
       return true;
     } catch (error) {
       console.error('Export error:', error);
