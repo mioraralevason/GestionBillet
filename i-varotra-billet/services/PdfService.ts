@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Asset } from 'expo-asset';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { Ticket } from './TicketService';
 import { Event } from './EventService';
 import * as FileSystem from 'expo-file-system';
@@ -10,6 +11,24 @@ export interface PdfExportOptions {
   fromNumber?: number;
   toNumber?: number;
 }
+
+const MAX_IMAGE_SIZE = 800;
+const COMPRESS_QUALITY = 0.6;
+
+const compressImage = async (uri: string): Promise<string | null> => {
+  try {
+    const manipulated = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: MAX_IMAGE_SIZE } }],
+      { compress: COMPRESS_QUALITY, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    const base64 = await FileSystem.readAsStringAsync(manipulated.uri, { encoding: 'base64' });
+    return `data:image/jpeg;base64,${base64}`;
+  } catch (e) {
+    console.log('Image compression failed:', e);
+    return null;
+  }
+};
 
 const extractNumber = (ticketNum: string | undefined): number => {
   if (!ticketNum) return 0;
@@ -60,8 +79,18 @@ export const PdfService = {
     }
 
     let eventImageUri = '';
-    if (event?.image && !event.image.startsWith('data:') && event.image.startsWith('http')) {
-      eventImageUri = event.image;
+    if (event?.image) {
+      if (event.image.startsWith('data:')) {
+        eventImageUri = await compressImage(event.image) || event.image;
+      } else if (event.image.startsWith('http')) {
+        eventImageUri = event.image;
+      } else {
+        try {
+          eventImageUri = await compressImage(event.image) || '';
+        } catch (e) {
+          console.log('Failed to load local image:', e);
+        }
+      }
     }
 
     let htmlContent = `<!DOCTYPE html>
