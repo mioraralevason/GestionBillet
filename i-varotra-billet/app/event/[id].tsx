@@ -52,12 +52,6 @@ export default function EventDetails() {
   const [imgY, setImgY] = useState(0);
   const [isClearMode, setIsClearMode] = useState(false);
 
-  // PDF Export options
-  const [showExportOptions, setShowExportOptions] = useState(false);
-  const [exportTicketTypeId, setExportTicketTypeId] = useState<number | null>(null);
-  const [exportFromNumber, setExportFromNumber] = useState('');
-  const [exportToNumber, setExportToNumber] = useState('');
-
   // Confirmation modals
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showExportInfo, setShowExportInfo] = useState(false);
@@ -121,11 +115,6 @@ export default function EventDetails() {
    */
   const handleExportPdf = async () => {
     if (!event) return;
-    setShowExportOptions(true);
-  };
-
-  const handleConfirmExport = async () => {
-    setShowExportOptions(false);
     setShowExportConfirm(true);
   };
 
@@ -141,15 +130,6 @@ export default function EventDetails() {
     }
 
     const options: PdfExportOptions = {};
-    if (exportTicketTypeId) {
-      options.ticketTypeId = exportTicketTypeId;
-    }
-    if (exportFromNumber) {
-      options.fromNumber = parseInt(exportFromNumber);
-    }
-    if (exportToNumber) {
-      options.toNumber = parseInt(exportToNumber);
-    }
 
     const success = await PdfService.exportTicketsToPdf(event, allTickets, options);
     if (!success) {
@@ -158,9 +138,6 @@ export default function EventDetails() {
       showSuccess('PDF exporté avec succès');
     }
     setExporting(false);
-    setExportTicketTypeId(null);
-    setExportFromNumber('');
-    setExportToNumber('');
   };
 
   /**
@@ -307,6 +284,17 @@ export default function EventDetails() {
         )}
 
         <TouchableOpacity
+          style={[styles.actionCard, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}
+          onPress={() => setShowPreview(true)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.actionIconWrapper, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
+            <MaterialCommunityIcons name="eye" size={32} color={theme.tint} />
+          </View>
+          <Text style={[styles.actionText, { color: theme.tint }]}>Visualiser modèle</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={[styles.actionCard, { backgroundColor: theme.success }]}
           onPress={handleExportPdf}
           disabled={exporting}
@@ -320,17 +308,6 @@ export default function EventDetails() {
             )}
           </View>
           <Text style={[styles.actionText, { color: '#000' }]}>Exporter PDF</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionCard, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}
-          onPress={() => setShowPreview(true)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.actionIconWrapper, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
-            <MaterialCommunityIcons name="eye" size={32} color={theme.tint} />
-          </View>
-          <Text style={[styles.actionText, { color: theme.tint }]}>Visualiser modèle</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -578,93 +555,10 @@ export default function EventDetails() {
         showCancel={false}
       />
 
-      {/* PDF Export Options Modal */}
-      <Modal
-        visible={showExportOptions}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowExportOptions(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Options d'export PDF</Text>
-            
-            <Text style={[styles.label, { color: theme.text }]}>Type de billet (optionnel)</Text>
-            <View style={styles.typeSelector}>
-              <TouchableOpacity
-                style={[
-                  styles.typeButton,
-                  !exportTicketTypeId && { backgroundColor: themeColor, borderColor: themeColor }
-                ]}
-                onPress={() => setExportTicketTypeId(null)}
-              >
-                <Text style={[styles.typeButtonText, !exportTicketTypeId && { color: '#FFF' }]}>Tous</Text>
-              </TouchableOpacity>
-              {ticketTypes.map(type => (
-                <TouchableOpacity
-                  key={type.id}
-                  style={[
-                    styles.typeButton,
-                    exportTicketTypeId === type.id && { backgroundColor: themeColor, borderColor: themeColor }
-                  ]}
-                  onPress={() => setExportTicketTypeId(type.id)}
-                >
-                  <Text style={[
-                    styles.typeButtonText,
-                    exportTicketTypeId === type.id && { color: '#FFF' }
-                  ]}>{type.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={[styles.label, { color: theme.text }]}>Numéro de billet (optionnel)</Text>
-            <View style={styles.numberRange}>
-              <TextInput
-                style={[styles.numberInput, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }]}
-                placeholder="Du n°"
-                placeholderTextColor={theme.tabIconDefault}
-                value={exportFromNumber}
-                onChangeText={setExportFromNumber}
-                keyboardType="numeric"
-              />
-              <Text style={{ color: theme.text }}>à</Text>
-              <TextInput
-                style={[styles.numberInput, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }]}
-                placeholder="Au n°"
-                placeholderTextColor={theme.tabIconDefault}
-                value={exportToNumber}
-                onChangeText={setExportToNumber}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.cancelButton, { borderColor: theme.border }]}
-                onPress={() => {
-                  setShowExportOptions(false);
-                  setExportTicketTypeId(null);
-                  setExportFromNumber('');
-                  setExportToNumber('');
-                }}
-              >
-                <Text style={{ color: theme.text }}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.confirmButton, { backgroundColor: themeColor }]}
-                onPress={handleConfirmExport}
-              >
-                <Text style={styles.confirmButtonText}>Continuer</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
       <ConfirmModal
         visible={showExportConfirm}
         title="Exporter les billets en PDF"
-        message={`Les billets seront exportés selon les critères sélectionnés.`}
+        message={`Exporter tous les billets générés pour cet événement?`}
         onConfirm={handleDoExport}
         onCancel={() => setShowExportConfirm(false)}
         confirmText="Exporter"

@@ -44,8 +44,27 @@ export const PdfService = {
   exportTicketsToPdf: async (event: Event, tickets: Ticket[], options?: PdfExportOptions) => {
     let filteredTickets = [...tickets];
     
+    // Filter by ticket type
+    if (options?.ticketTypeId) {
+      filteredTickets = filteredTickets.filter(t => t.ticket_type_id === options.ticketTypeId);
+    }
+    
+    // Filter by number range
+    if (options?.fromNumber) {
+      filteredTickets = filteredTickets.filter(t => {
+        const num = extractNumber(t.ticket_number);
+        return num >= options.fromNumber!;
+      });
+    }
+    if (options?.toNumber) {
+      filteredTickets = filteredTickets.filter(t => {
+        const num = extractNumber(t.ticket_number);
+        return num <= options.toNumber!;
+      });
+    }
+    
     if (filteredTickets.length === 0) {
-      console.error('No tickets to export!');
+      console.error('No tickets to export with given filters!');
       return false;
     }
 
@@ -80,7 +99,9 @@ export const PdfService = {
 
     let eventImageUri = '';
     if (event?.image) {
-      if (event.image.startsWith('data:')) {
+      if (event.image.includes('image/svg') || event.image.startsWith('<svg')) {
+        console.log('SVG image not supported for PDF');
+      } else if (event.image.startsWith('data:')) {
         eventImageUri = await compressImage(event.image) || event.image;
       } else if (event.image.startsWith('http')) {
         eventImageUri = event.image;
