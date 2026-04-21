@@ -1,0 +1,82 @@
+{
+  "expo": {
+    "name": "iBillet",
+    "slug": "i-varotra-billet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/logo_iBillet.png",
+    "scheme": "ivarotrabillet",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.ivarotra.billet",
+      "allowedLocales": ["fr-FR", "en-US"],
+      "ndk": "27.2.12479018",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/logo_iBillet.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "minifyEnabled": true,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/logo_iBillet.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableShrinkResources": true,
+            "androidJsBundleLoader": "normal",
+            "extraProguardRules": "-keep class com.facebook.react.** { *; }\n-keep class com.swmansion.** { *; }",
+            "buildArchs": ["arm64-v8a", "armeabi-v7a"]
+          }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/logo_iBillet.png",
+          "imageWidth": 300,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-sqlite",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "L'accès à la caméra est nécessaire pour scanner les QR codes des billets.",
+          "microphonePermission": "L'accès au microphone n'est pas utilisé mais requis par le plugin."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6857ed27-d112-4357-b4d3-cf992d02b139"
+      }
+    }
+  }
+}
