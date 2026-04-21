@@ -478,34 +478,65 @@ export default function EventDetails() {
                     <Text style={[styles.controlBtnText, { color: '#000' }]}>Ajuster la photo</Text>
                   </TouchableOpacity>
                 ) : (
-                  <View style={[styles.adjustmentPanel, { backgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#F9F9F9', borderColor: theme.border }]}>
-                    <View style={styles.controlRow}>
-                      <TouchableOpacity onPress={() => setImgScale(s => Math.max(0.5, s - 0.1))}><MaterialCommunityIcons name="minus-circle" size={24} color={theme.icon} /></TouchableOpacity>
-                      <Text style={[styles.controlLabel, { color: theme.text }]}>Zoom: {imgScale.toFixed(1)}x</Text>
-                      <TouchableOpacity onPress={() => setImgScale(s => Math.min(3, s + 0.1))}><MaterialCommunityIcons name="plus-circle" size={24} color={theme.icon} /></TouchableOpacity>
-                    </View>
-                    <View style={styles.controlRow}>
-                      <TouchableOpacity onPress={() => setImgRotate(r => r - 10)}><MaterialCommunityIcons name="rotate-left" size={24} color={theme.icon} /></TouchableOpacity>
-                      <Text style={[styles.controlLabel, { color: theme.text }]}>Rot: {imgRotate}°</Text>
-                      <TouchableOpacity onPress={() => setImgRotate(r => r + 10)}><MaterialCommunityIcons name="rotate-right" size={24} color={theme.icon} /></TouchableOpacity>
-                    </View>
-                    <View style={styles.moveControls}>
-                      <TouchableOpacity onPress={() => setImgY(y => y - 5)}><MaterialCommunityIcons name="chevron-up" size={24} color={theme.icon} /></TouchableOpacity>
-                      <View style={{ flexDirection: 'row', gap: 20 }}>
-                        <TouchableOpacity onPress={() => setImgX(x => x - 5)}><MaterialCommunityIcons name="chevron-left" size={24} color={theme.icon} /></TouchableOpacity>
-                        <TouchableOpacity onPress={() => setImgX(x => x + 5)}><MaterialCommunityIcons name="chevron-right" size={24} color={theme.icon} /></TouchableOpacity>
+                  <View style={[styles.adjustmentPanelCompact, { backgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#F9F9F9', borderColor: theme.border }]}>
+                      <View style={styles.adjCompactRow}>
+                        <View style={styles.adjCompactItem}>
+                          <Text style={[styles.adjCompactLabel, { color: theme.text }]}>Zoom</Text>
+                          <View style={styles.adjCompactControls}>
+                            <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgScale(s => Math.max(0.5, s - 0.1))}>
+                              <MaterialCommunityIcons name="minus" size={16} color={theme.icon} />
+                            </TouchableOpacity>
+                            <Text style={[styles.adjCompactValue, { color: themeColor }]}>{imgScale.toFixed(1)}</Text>
+                            <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgScale(s => Math.min(3, s + 0.1))}>
+                              <MaterialCommunityIcons name="plus" size={16} color={theme.icon} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        <View style={styles.adjCompactItem}>
+                          <Text style={[styles.adjCompactLabel, { color: theme.text }]}>Rot</Text>
+                          <View style={styles.adjCompactControls}>
+                            <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgRotate(r => r - 10)}>
+                              <MaterialCommunityIcons name="rotate-left" size={16} color={theme.icon} />
+                            </TouchableOpacity>
+                            <Text style={[styles.adjCompactValue, { color: themeColor }]}>{imgRotate}°</Text>
+                            <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgRotate(r => r + 10)}>
+                              <MaterialCommunityIcons name="rotate-right" size={16} color={theme.icon} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        <View style={styles.adjCompactItem}>
+                          <Text style={[styles.adjCompactLabel, { color: theme.text }]}>Pos</Text>
+                          <View style={styles.adjCompactControls}>
+                            <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => { setImgX(0); setImgY(0); }}>
+                              <MaterialCommunityIcons name="close" size={16} color={theme.danger} />
+                            </TouchableOpacity>
+                            <Text style={[styles.adjCompactValue, { color: themeColor }]}>{imgX},{imgY}</Text>
+                            <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgY(y => y + 5)}>
+                              <MaterialCommunityIcons name="chevron-down" size={16} color={theme.icon} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
                       </View>
-                      <TouchableOpacity onPress={() => setImgY(y => y + 5)}><MaterialCommunityIcons name="chevron-down" size={24} color={theme.icon} /></TouchableOpacity>
+                      <View style={styles.adjCompactMoveRow}>
+                        <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgY(y => y - 5)}>
+                          <MaterialCommunityIcons name="chevron-up" size={20} color={theme.icon} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgX(x => x - 5)}>
+                          <MaterialCommunityIcons name="chevron-left" size={20} color={theme.icon} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgX(x => x + 5)}>
+                          <MaterialCommunityIcons name="chevron-right" size={20} color={theme.icon} />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.controlButtonsRow}>
+                        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#64748B' }]} onPress={() => { setIsAdjusting(false); fetchData(); }}>
+                          <Text style={[styles.actionBtnText, { color: '#FFF' }]}>Annuler</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: themeColor }]} onPress={handleSaveAdjustments}>
+                          <Text style={[styles.actionBtnText, { color: '#000' }]}>Sauvegarder</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                    <View style={styles.controlButtonsRow}>
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#64748B' }]} onPress={() => { setIsAdjusting(false); fetchData(); }}>
-                        <Text style={[styles.actionBtnText, { color: '#000' }]}>Annuler</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: themeColor }]} onPress={handleSaveAdjustments}>
-                        <Text style={[styles.actionBtnText, { color: '#000' }]}>Sauvegarder</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
                 )}
               </View>
             )}
@@ -714,7 +745,6 @@ const styles = StyleSheet.create({
   ticketTypeStatValue: { fontSize: 16, fontWeight: 'bold' },
   ticketTypeStatLabel: { fontSize: 10, marginTop: 2 },
   row: { flexDirection: 'row', marginBottom: 15 },
-  label: { fontSize: 13, marginBottom: 5 },
   input: { borderRadius: 8, padding: 12, fontSize: 16 },
   button: { flexDirection: 'row', borderRadius: 10, padding: 15, alignItems: 'center', justifyContent: 'center', gap: 10 },
   buttonText: { fontSize: 16, fontWeight: 'bold' },
@@ -723,8 +753,9 @@ const styles = StyleSheet.create({
   actionCard: { width: '47%', padding: 20, borderRadius: 16, alignItems: 'center', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
   actionIconWrapper: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   actionText: { fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 20 },
-  previewContent: { borderRadius: 24, padding: 20, maxHeight: '90%', backgroundColor: '#111827', borderWidth: 1, borderColor: '#1E293B' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  previewContent: { borderRadius: 24, padding: 20, maxHeight: '85%', backgroundColor: '#111827', borderWidth: 1, borderColor: '#1E293B' },
+  previewScrollView: { flex: 1 },
   previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   previewTitle: { fontSize: 20, fontWeight: '900', color: '#FFFFFF' },
   toggleContainer: { flexDirection: 'row', borderRadius: 12, padding: 4, marginBottom: 20, backgroundColor: '#1E293B' },
@@ -763,9 +794,26 @@ const styles = StyleSheet.create({
   controlButtonsRow: { flexDirection: 'row', gap: 10, paddingTop: 10, borderTopWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
   actionBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
   actionBtnText: { fontWeight: 'bold' },
+  adjustmentSection: { paddingVertical: 10 },
+  adjustmentLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  sliderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  adjustmentBtn: { width: 36, height: 36, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  sliderTrack: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
+  sliderFill: { height: '100%', borderRadius: 3 },
+  adjustmentValue: { fontSize: 12, fontWeight: 'bold', textAlign: 'center', marginTop: 4 },
+  moveGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 4, width: 120, alignSelf: 'center' },
+  moveBtn: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  moveBtnReset: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  adjustmentPanelCompact: { borderRadius: 10, padding: 10, borderWidth: 1, gap: 8 },
+  adjCompactRow: { flexDirection: 'row', justifyContent: 'space-around' },
+  adjCompactItem: { alignItems: 'center' },
+  adjCompactLabel: { fontSize: 10, fontWeight: '600', marginBottom: 4 },
+  adjCompactControls: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  adjCompactBtn: { width: 28, height: 28, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
+  adjCompactValue: { fontSize: 11, fontWeight: 'bold', minWidth: 30, textAlign: 'center' },
+  adjCompactMoveRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 4 },
   deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1 },
   deleteButtonText: { fontWeight: 'bold' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '85%', padding: 20, borderRadius: 12, elevation: 5 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
   label: { fontSize: 14, fontWeight: '600', marginTop: 15, marginBottom: 8 },
