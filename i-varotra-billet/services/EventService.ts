@@ -161,6 +161,10 @@ export const EventService = {
    */
   deleteEvent: (id: number): boolean => {
     try {
+      db.runSync(`DELETE FROM payments WHERE ticket_id IN (SELECT id FROM tickets WHERE event_id = ?)`, id);
+      db.runSync(`DELETE FROM attendance WHERE ticket_id IN (SELECT id FROM tickets WHERE event_id = ?)`, id);
+      db.runSync(`DELETE FROM tickets WHERE event_id = ?`, id);
+      db.runSync(`DELETE FROM ticket_types WHERE event_id = ?`, id);
       db.runSync(`DELETE FROM events WHERE id = ?`, id);
       return true;
     } catch (error) {

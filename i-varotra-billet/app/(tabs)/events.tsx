@@ -211,6 +211,16 @@ export default function EventsList() {
           <MaterialCommunityIcons name="plus" size={30} color="#000" />
         </TouchableOpacity>
       )}
+
+      <ConfirmModal
+        visible={confirmVisible}
+        title="Supprimer l'événement"
+        message="Êtes-vous sûr de vouloir supprimer cet événement et tous les billets associés ? Cette action est irréversible."
+        onConfirm={onConfirmDelete}
+        onCancel={() => setConfirmVisible(false)}
+        confirmText="Supprimer"
+        type="danger"
+      />
     </SafeAreaView>
   );
 }
