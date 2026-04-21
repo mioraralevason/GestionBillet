@@ -22,6 +22,8 @@ export default function BatchAssign() {
   const [buyerSearch, setBuyerSearch] = useState('');
 
   const [amounts, setAmounts] = useState<Record<number, string>>({});
+  const [ticketBuyers, setTicketBuyers] = useState<Record<number, { name: string; phone: string }>>({});
+  const [showTicketBuyer, setShowTicketBuyer] = useState<number | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
@@ -36,14 +38,17 @@ export default function BatchAssign() {
     setSelectedTickets(fetched);
     
     const initialAmounts: Record<number, string> = {};
+    const initialBuyers: Record<number, { name: string; phone: string }> = {};
     fetched.forEach(t => {
       if (mode === 'pay') {
         initialAmounts[t.id!] = t.price.toString();
       } else {
         initialAmounts[t.id!] = '0';
       }
+      initialBuyers[t.id!] = { name: t.buyer_name || '', phone: t.buyer_phone || '' };
     });
     setAmounts(initialAmounts);
+    setTicketBuyers(initialBuyers);
   }, [ids, mode]));
 
   const updateAmount = (id: number, val: string) => {
@@ -78,25 +83,44 @@ export default function BatchAssign() {
     setNewPhone('');
   };
 
+  const updateTicketBuyer = (ticketId: number, name: string, phone: string) => {
+    setTicketBuyers(prev => ({ ...prev, [ticketId]: { name, phone } }));
+    setShowTicketBuyer(null);
+    setBuyerSearch('');
+  };
+
+  const selectBuyerForTicket = (ticketId: number, b: Buyer) => {
+    updateTicketBuyer(ticketId, b.name, b.phone || '');
+  };
+
+  const addNewBuyerForTicket = (ticketId: number) => {
+    if (!newName.trim()) return;
+    updateTicketBuyer(ticketId, newName.trim(), newPhone.trim());
+    setShowAddModal(false);
+    setNewName('');
+    setNewPhone('');
+  };
+
   const handleAction = () => {
-    if (!buyerName.trim()) {
-      setActionErrorMessage('Veuillez choisir un acheteur.');
-      setShowActionError(true);
-      return;
+    for (const t of selectedTickets) {
+      const buyer = ticketBuyers[t.id!];
+      if (!buyer?.name.trim()) {
+        setActionErrorMessage(`Veuillez choisir un acheteur pour le billet ${t.ticket_number}`);
+        setShowActionError(true);
+        return;
+      }
     }
 
-    const items = selectedTickets.map(t => ({
-      id: t.id!,
-      amount: parseFloat(amounts[t.id!] || '0')
-    }));
+    let allSuccess = true;
+    selectedTickets.forEach(t => {
+      const buyer = ticketBuyers[t.id!];
+      const amount = mode === 'pay' ? parseFloat(amounts[t.id!] || '0') : 0;
+      if (!TicketService.assignTicket(t.id!, buyer.name.trim(), buyer.phone.trim(), amount)) {
+        allSuccess = false;
+      }
+    });
 
-    const data = {
-      buyer_name: buyerName.trim(),
-      buyer_phone: buyerPhone.trim(),
-      items: items
-    };
-
-    if (TicketService.updateTicketsBatch(data)) {
+    if (allSuccess) {
       showSuccess('Billets mis à jour avec succès.');
       router.back();
     } else {
@@ -129,65 +153,6 @@ export default function BatchAssign() {
             <Text style={styles.subtitle}>{ticketIds.length} Billets sélectionnés</Text>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.label}>ACHETEUR POUR TOUS</Text>
-            <TouchableOpacity style={styles.dropdown} onPress={() => setShowBuyerList(!showBuyerList)}>
-              <MaterialCommunityIcons name="account" size={20} color="#6366F1" style={{ marginRight: 10 }} />
-              <Text style={{ color: buyerName ? '#FFFFFF' : '#64748B', fontSize: 16, flex: 1 }}>
-                {buyerName || "Rechercher ou ajouter..."}
-              </Text>
-              <MaterialCommunityIcons name={showBuyerList ? "chevron-up" : "chevron-down"} size={20} color="#94A3B8" />
-            </TouchableOpacity>
-
-            {showBuyerList && (
-              <View style={styles.buyerList}>
-                <View style={styles.searchDropdownWrapper}>
-                  <MaterialCommunityIcons name="magnify" size={18} color="#94A3B8" />
-                  <TextInput
-                    style={styles.searchDropdownInput}
-                    placeholder="Rechercher..."
-                    placeholderTextColor="#64748B"
-                    value={buyerSearch}
-                    onChangeText={setBuyerSearch}
-                    autoFocus
-                  />
-                </View>
-                
-                <TouchableOpacity 
-                  style={styles.addNewOption} 
-                  onPress={() => {
-                    setNewName(buyerSearch);
-                    setShowAddModal(true);
-                    setShowBuyerList(false);
-                  }}
-                >
-                  <MaterialCommunityIcons name="account-plus" size={24} color="#6366F1" />
-                  <Text style={styles.addNewText}>Nouvel acheteur</Text>
-                </TouchableOpacity>
-
-                {filteredBuyers.map(b => (
-                  <TouchableOpacity key={b.id} style={styles.buyerOption} onPress={() => selectBuyer(b)}>
-                    <Text style={styles.buyerNameText}>{b.name}</Text>
-                    {b.phone && <Text style={{ fontSize: 12, color: '#94A3B8' }}>{b.phone}</Text>}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {buyerName ? (
-            <View style={styles.selectedBuyerCard}>
-              <MaterialCommunityIcons name="account-check" size={24} color="#10B981" />
-              <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={{ fontWeight: 'bold', color: '#FFFFFF' }}>{buyerName}</Text>
-                {buyerPhone && <Text style={{ fontSize: 12, color: '#94A3B8' }}>{buyerPhone}</Text>}
-              </View>
-              <TouchableOpacity onPress={() => { setBuyerName(''); setBuyerPhone(''); }}>
-                <MaterialCommunityIcons name="close-circle" size={20} color="#FF2E63" />
-              </TouchableOpacity>
-            </View>
-          ) : null}
-
           <View style={styles.ticketsSection}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
               <Text style={styles.label}>DÉTAILS DES BILLETS</Text>
@@ -203,6 +168,15 @@ export default function BatchAssign() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.ticketNum}>{t.ticket_number}</Text>
                   <Text style={styles.ticketPrice}>{t.price} Ar</Text>
+                  <TouchableOpacity 
+                    style={styles.ticketBuyerBtn}
+                    onPress={() => setShowTicketBuyer(t.id!)}
+                  >
+                    <MaterialCommunityIcons name="account" size={14} color={ticketBuyers[t.id!]?.name ? "#10B981" : "#FF2E63"} />
+                    <Text style={[styles.ticketBuyerText, { color: ticketBuyers[t.id!]?.name ? "#10B981" : "#FF2E63" }]}>
+                      {ticketBuyers[t.id!]?.name || "Ajouter acheteur"}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
                 {mode === 'pay' ? (
                   <TextInput
@@ -219,6 +193,46 @@ export default function BatchAssign() {
               </View>
             ))}
           </View>
+
+          <Modal visible={showTicketBuyer !== null} transparent animationType="slide">
+            <View style={styles.modalOverlayDark}>
+              <View style={styles.modalContentDark}>
+                <Text style={styles.modalTitleDark}>Sélectionner l'acheteur</Text>
+                <View style={styles.searchDropdownWrapper}>
+                  <MaterialCommunityIcons name="magnify" size={18} color="#94A3B8" />
+                  <TextInput
+                    style={styles.searchDropdownInput}
+                    placeholder="Rechercher..."
+                    placeholderTextColor="#64748B"
+                    value={buyerSearch}
+                    onChangeText={setBuyerSearch}
+                    autoFocus
+                  />
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.addNewOption} 
+                  onPress={() => setShowAddModal(true)}
+                >
+                  <MaterialCommunityIcons name="account-plus" size={24} color="#6366F1" />
+                  <Text style={styles.addNewText}>Nouvel acheteur</Text>
+                </TouchableOpacity>
+
+                <ScrollView style={{ maxHeight: 200 }}>
+                  {filteredBuyers.map(b => (
+                    <TouchableOpacity key={b.id} style={styles.buyerOption} onPress={() => showTicketBuyer && selectBuyerForTicket(showTicketBuyer, b)}>
+                      <Text style={styles.buyerNameText}>{b.name}</Text>
+                      {b.phone && <Text style={{ fontSize: 12, color: '#94A3B8' }}>{b.phone}</Text>}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <TouchableOpacity style={[styles.btnCancel, { marginTop: 15 }]} onPress={() => setShowTicketBuyer(null)}>
+                  <Text style={styles.btnTextCancel}>Fermer</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
 
           <View style={styles.actions}>
             <TouchableOpacity 
@@ -260,10 +274,16 @@ export default function BatchAssign() {
                   onChangeText={setNewPhone}
                 />
                 <View style={styles.modalButtons}>
-                  <TouchableOpacity style={styles.btnCancel} onPress={() => setShowAddModal(false)}>
+                  <TouchableOpacity style={styles.btnCancel} onPress={() => { setShowAddModal(false); setNewName(''); setNewPhone(''); }}>
                     <Text style={styles.btnTextCancel}>Annuler</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.btnConfirm} onPress={handleQuickAddBuyer}>
+                  <TouchableOpacity style={styles.btnConfirm} onPress={() => {
+                    if (showTicketBuyer) {
+                      addNewBuyerForTicket(showTicketBuyer);
+                    } else {
+                      handleQuickAddBuyer();
+                    }
+                  }}>
                     <Text style={styles.btnTextConfirm}>Ajouter</Text>
                   </TouchableOpacity>
                 </View>
@@ -363,6 +383,8 @@ const styles = StyleSheet.create({
   },
   ticketNum: { fontSize: 16, fontWeight: '900', color: '#FFFFFF' },
   ticketPrice: { fontSize: 13, color: '#94A3B8' },
+  ticketBuyerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  ticketBuyerText: { fontSize: 12, fontWeight: '600' },
   amountInput: { 
     backgroundColor: '#000000', 
     width: 100, 
