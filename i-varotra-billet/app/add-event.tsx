@@ -20,6 +20,7 @@ import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import ColorPicker from 'react-native-wheel-color-picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { EventService } from '../services/EventService';
 import { TicketService } from '../services/TicketService';
@@ -96,13 +97,22 @@ export default function AddEventCarousel() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [16, 9],
-      quality: 0.7,
-      base64: true,
+      quality: 0.8,
     });
 
     if (!result.canceled) {
       const imageAsset = result.assets[0];
-      setImage(imageAsset.base64 ? `data:image/jpeg;base64,${imageAsset.base64}` : imageAsset.uri);
+      try {
+        const fileName = `event_${Date.now()}.jpg`;
+        const filePath = `${FileSystem.documentDirectory}images/${fileName}`;
+        
+        await FileSystem.makeDirectoryAsync(`${FileSystem.documentDirectory}images/`, { intermediates: true });
+        await FileSystem.copyAsync({ from: imageAsset.uri, to: filePath });
+        
+        setImage(filePath);
+      } catch (error) {
+        Toast.show({ type: 'error', text1: 'Erreur', text2: 'Impossible de sauvegarder l\'image' });
+      }
     }
   };
 
