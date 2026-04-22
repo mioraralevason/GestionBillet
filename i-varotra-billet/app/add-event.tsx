@@ -86,6 +86,12 @@ export default function AddEventCarousel() {
   }, [eventId, isEditing]);
 
   const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Toast.show({ type: 'error', text1: 'Permission requise', text2: 'Accès à la galerie nécessaire' });
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
