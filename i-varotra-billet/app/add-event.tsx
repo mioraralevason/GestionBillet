@@ -87,32 +87,42 @@ export default function AddEventCarousel() {
   }, [eventId, isEditing]);
 
   const pickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Toast.show({ type: 'error', text1: 'Permission requise', text2: 'Accès à la galerie nécessaire' });
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      const imageAsset = result.assets[0];
-      try {
-        const fileName = `event_${Date.now()}.jpg`;
-        const filePath = `${FileSystem.documentDirectory}images/${fileName}`;
-        
-        await FileSystem.makeDirectoryAsync(`${FileSystem.documentDirectory}images/`, { intermediates: true });
-        await FileSystem.copyAsync({ from: imageAsset.uri, to: filePath });
-        
-        setImage(filePath);
-      } catch (error) {
-        Toast.show({ type: 'error', text1: 'Erreur', text2: 'Impossible de sauvegarder l\'image' });
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission requise', 'Accès à la galerie nécessaire pour importer une image.');
+        return;
       }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets?.[0]) {
+        const imageAsset = result.assets[0];
+        try {
+          const base64 = await FileSystem.readAsStringAsync(imageAsset.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          if (!base64) throw new Error('Base64 vide');
+          if (base64.length > 2_000_000) {
+            Alert.alert('Image trop volumineuse', 'L\'image dépasse 2 Mo après conversion. Choisissez une image plus petite.');
+            return;
+          }
+          const base64Uri = `data:image/jpeg;base64,${base64}`;
+          setImage(base64Uri);
+          Toast.show({ type: 'success', text1: 'Image importée', text2: 'Image prête à être sauvegardée' });
+        } catch (error: any) {
+          console.error('Error converting image to base64', error);
+          Alert.alert('Erreur d\'importation', `Impossible de convertir l'image: ${error?.message || error}`);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error picking image', error);
+      Alert.alert('Erreur', `Erreur lors de l'importation: ${error?.message || error}`);
     }
   };
 
@@ -329,6 +339,7 @@ export default function AddEventCarousel() {
       });
       router.replace('/(tabs)/home');
     } else {
+      Alert.alert('Erreur de sauvegarde', "Impossible d'enregistrer l'événement. Vérifiez que l'image n'est pas trop volumineuse.");
       Toast.show({
         type: 'error',
         text1: 'Erreur',
