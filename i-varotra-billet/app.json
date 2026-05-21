@@ -9,27 +9,18 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ivarotra.billet"
     },
     "android": {
-      "package": "com.ivarotra.billet",
-      "allowedLocales": [
-        "fr-FR",
-        "en-US"
-      ],
-      "ndk": "27.2.12479018",
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/logo_iBillet.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "minifyEnabled": true,
+      "package": "com.ralevasonmiora.ivarotrabillet",
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.INTERNET"
       ]
     },
     "web": {
@@ -42,9 +33,9 @@
         "expo-build-properties",
         {
           "android": {
-            "enableShrinkResources": true,
+            "enableShrinkResources": false,
             "androidJsBundleLoader": "normal",
-            "extraProguardRules": "-keep class com.facebook.react.** { *; }\n-keep class com.swmansion.** { *; }",
+            "extraProguardRules": "-keep class com.facebook.react.** { *; }\n-keep class com.swmansion.** { *; }\n-keep class expo.modules.** { *; }\n-keep class com.google.android.gms.internal.** { *; }\n-keep class com.facebook.imagepipeline.** { *; }",
             "buildArchs": [
               "arm64-v8a",
               "armeabi-v7a"
@@ -72,7 +63,18 @@
           "cameraPermission": "L'accès à la caméra est nécessaire pour scanner les QR codes des billets.",
           "microphonePermission": "L'accès au microphone n'est pas utilisé mais requis par le plugin."
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "L'accès à la galerie est nécessaire pour sélectionner les images des événements.",
+          "cameraPermission": "L'accès à la caméra est nécessaire pour prendre des photos d'événements."
+        }
+      ],
+      "expo-file-system",
+      "expo-system-ui",
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
