@@ -15,21 +15,6 @@ export interface PdfExportOptions {
 const MAX_IMAGE_SIZE = 800;
 const COMPRESS_QUALITY = 0.6;
 
-const compressImage = async (uri: string): Promise<string | null> => {
-  try {
-    const manipulated = await ImageManipulator.manipulateAsync(
-      uri,
-      [{ resize: { width: MAX_IMAGE_SIZE } }],
-      { compress: COMPRESS_QUALITY, format: ImageManipulator.SaveFormat.JPEG }
-    );
-    const base64 = await FileSystem.readAsStringAsync(manipulated.uri, { encoding: 'base64' });
-    return `data:image/jpeg;base64,${base64}`;
-  } catch (e) {
-    console.log('Image compression failed:', e);
-    return null;
-  }
-};
-
 const extractNumber = (ticketNum: string | undefined): number => {
   if (!ticketNum) return 0;
   const lastDash = ticketNum.lastIndexOf('-');
@@ -40,16 +25,106 @@ const extractNumber = (ticketNum: string | undefined): number => {
   return parseInt(numStr, 10);
 };
 
+const loadImageAsBase64 = async (uri: string): Promise<string | null> => {
+  try {
+    if (uri.startsWith('data:')) {
+      return uri;
+    }
+    
+    let fileUri = uri;
+    if (uri.startsWith('content://')) {
+      const downloadResult = await FileSystem.downloadAsync(
+        uri,
+        FileSystem.cacheDirectory + 'temp_image.jpg'
+      );
+      fileUri = downloadResult.uri;
+    }
+    
+    const info = await FileSystem.getInfoAsync(fileUri);
+    if (!info.exists) {
+      console.log('Image file does not exist:', fileUri);
+      return null;
+    }
+    
+    const base64 = await FileSystem.readAsStringAsync(fileUri, { encoding: 'base64' });
+    return `data:image/jpeg;base64,${base64}`;
+  } catch (e) {
+    console.log('Failed to load image as base64:', e);
+    return null;
+  }
+};
+
+const compressImageToBase64 = async (uri: string): Promise<string | null> => {
+  try {
+    let sourceUri = uri;
+    
+    if (uri.startsWith('data:')) {
+      const matches = uri.match(/^data:([a-z]+\/[a-z]+);base64,(.*)$/i);
+      if (!matches) return null;
+      const base64Data = matches[2];
+      const tempPath = `${FileSystem.cacheDirectory}temp_data_${Date.now()}.jpg`;
+      await FileSystem.writeAsStringAsync(tempPath, base64Data, { encoding: 'base64' });
+      sourceUri = tempPath;
+    } else if (uri.startsWith('http')) {
+      const tempPath = `${FileSystem.cacheDirectory}temp_remote_${Date.now()}.jpg`;
+      const downloadResult = await FileSystem.downloadAsync(uri, tempPath);
+      sourceUri = downloadResult.uri;
+    } else if (uri.startsWith('content://')) {
+      const tempPath = `${FileSystem.cacheDirectory}temp_content_${Date.now()}.jpg`;
+      const downloadResult = await FileSystem.downloadAsync(uri, tempPath);
+      sourceUri = downloadResult.uri;
+    }
+    
+    const info = await FileSystem.getInfoAsync(sourceUri);
+    if (!info.exists) {
+      console.log('Image file does not exist after processing:', sourceUri);
+      return null;
+    }
+    
+    const manipulated = await ImageManipulator.manipulateAsync(
+      sourceUri,
+      [{ resize: { width: MAX_IMAGE_SIZE } }],
+      { compress: COMPRESS_QUALITY, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    
+    const base64 = await FileSystem.readAsStringAsync(manipulated.uri, { encoding: 'base64' });
+    return `data:image/jpeg;base64,${base64}`;
+  } catch (e) {
+    console.log('Image compression failed, using original:', e);
+    try {
+      let sourceUri = uri;
+      if (uri.startsWith('data:')) {
+        const matches = uri.match(/^data:([a-z]+\/[a-z]+);base64,(.*)$/i);
+        if (matches) {
+          const base64Data = matches[2];
+          const tempPath = `${FileSystem.cacheDirectory}temp_direct_${Date.now()}.jpg`;
+          await FileSystem.writeAsStringAsync(tempPath, base64Data, { encoding: 'base64' });
+          sourceUri = tempPath;
+        }
+      } else if (uri.startsWith('http')) {
+        const tempPath = `${FileSystem.cacheDirectory}temp_direct_${Date.now()}.jpg`;
+        const downloadResult = await FileSystem.downloadAsync(uri, tempPath);
+        sourceUri = downloadResult.uri;
+      }
+      if (!sourceUri.startsWith('data:')) {
+        const base64 = await FileSystem.readAsStringAsync(sourceUri, { encoding: 'base64' });
+        return `data:image/jpeg;base64,${base64}`;
+      }
+    } catch (fallbackError) {
+      console.log('Fallback also failed:', fallbackError);
+    }
+    return null;
+  }
+};
+
 export const PdfService = {
   exportTicketsToPdf: async (event: Event, tickets: Ticket[], options?: PdfExportOptions) => {
     let filteredTickets = [...tickets];
     
-    // Filter by ticket type
     if (options?.ticketTypeId) {
       filteredTickets = filteredTickets.filter(t => t.ticket_type_id === options.ticketTypeId);
     }
     
-    // Filter by number range
     if (options?.fromNumber) {
       filteredTickets = filteredTickets.filter(t => {
         const num = extractNumber(t.ticket_number);
@@ -82,7 +157,6 @@ export const PdfService = {
 
     const themeColor = safeEvent.color;
 
-    // Load logo as base64
     let logoUri = '';
     const logoFallback = '<svg width="100%" height="100%" viewBox="0 0 200 200"><circle cx="100" cy="100" r="90" fill="none" stroke="#333" stroke-width="8"/><text x="100" y="115" font-size="50" font-weight="bold" text-anchor="middle" fill="#333">iBillet</text></svg>';
     
@@ -90,8 +164,7 @@ export const PdfService = {
       const logoAsset = Asset.fromModule(require('../assets/logo_iBillet.png'));
       await logoAsset.downloadAsync();
       const localUri = logoAsset.localUri || logoAsset.uri;
-      const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: 'base64' });
-      logoUri = `data:image/png;base64,${base64}`;
+      logoUri = await loadImageAsBase64(localUri) || '';
       console.log('Logo loaded successfully');
     } catch (e) {
       console.log('Logo loading error, using fallback:', e);
@@ -101,16 +174,8 @@ export const PdfService = {
     if (event?.image) {
       if (event.image.includes('image/svg') || event.image.startsWith('<svg')) {
         console.log('SVG image not supported for PDF');
-      } else if (event.image.startsWith('data:')) {
-        eventImageUri = await compressImage(event.image) || event.image;
-      } else if (event.image.startsWith('http')) {
-        eventImageUri = event.image;
       } else {
-        try {
-          eventImageUri = await compressImage(event.image) || '';
-        } catch (e) {
-          console.log('Failed to load local image:', e);
-        }
+        eventImageUri = await compressImageToBase64(event.image) || '';
       }
     }
 
