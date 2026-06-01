@@ -1,13 +1,13 @@
 // app/(tabs)/buyers.tsx
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, Modal, Alert, StatusBar, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { BuyerService, Buyer } from '../../services/BuyerService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Stack, useFocusEffect } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Dimensions, FlatList, Modal, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ConfirmModal from '../../components/ConfirmModal';
 import ToastMessage from '../../components/ToastMessage';
+import { Buyer, BuyerService } from '../../services/BuyerService';
 
 const { width } = Dimensions.get('window');
 
@@ -20,7 +20,6 @@ export default function BuyersList() {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastConfig, setToastConfig] = useState<{ title: string; message?: string; type: 'success' | 'error' | 'warning' | 'info' }>({ title: '', type: 'info' });
   const [role, setRole] = useState<string | null>(null);
-
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -44,7 +43,10 @@ export default function BuyersList() {
   const filteredBuyers = useMemo(() => {
     if (!search.trim()) return buyers;
     const q = search.toLowerCase();
-    return buyers.filter(b => b.name.toLowerCase().includes(q) || (b.phone && b.phone.includes(q)));
+    return buyers.filter(b => 
+      b.name.toLowerCase().includes(q) || 
+      (b.phone && b.phone.includes(q))
+    );
   }, [search, buyers]);
 
   const handleSaveBuyer = () => {
@@ -53,7 +55,11 @@ export default function BuyersList() {
       setToastVisible(true);
       return;
     }
-    let success = editingId ? BuyerService.updateBuyer({ id: editingId, name, phone }) : !!BuyerService.addBuyer({ name, phone });
+
+    let success = editingId 
+      ? BuyerService.updateBuyer({ id: editingId, name, phone }) 
+      : !!BuyerService.addBuyer({ name, phone });
+
     if (success) {
       setModalVisible(false);
       fetchBuyers();
@@ -63,8 +69,12 @@ export default function BuyersList() {
         type: 'success'
       });
       setToastVisible(true);
-    }
-    else {
+      
+      // Reset form
+      setName('');
+      setPhone('');
+      setEditingId(null);
+    } else {
       setToastConfig({ title: 'Erreur', message: "Impossible d'enregistrer.", type: 'error' });
       setToastVisible(true);
     }
@@ -115,7 +125,7 @@ export default function BuyersList() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <Stack.Screen 
+      <Stack.Screen
         options={{
           headerTitle: isSearchActive ? () => (
             <View style={styles.headerSearchContainer}>
@@ -155,25 +165,42 @@ export default function BuyersList() {
         }
       />
 
+      {/* FAB identique à events.tsx */}
       {role !== 'verificateur' && (
         <TouchableOpacity style={styles.fab} onPress={() => openModal()}>
           <MaterialCommunityIcons name="account-plus" size={30} color="#000" />
         </TouchableOpacity>
       )}
 
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+      {/* Modal Centré */}
+      <Modal visible={modalVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editingId ? "Modifier l'acheteur" : "Nouvel Acheteur"}</Text>
+            <Text style={styles.modalTitle}>
+              {editingId ? "Modifier l'acheteur" : "Nouvel Acheteur"}
+            </Text>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>NOM COMPLET</Text>
-              <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Ex: Jean Dupont" placeholderTextColor="#4B5563" />
+              <TextInput
+                style={styles.input}
+                value={name}
+                onChangeText={setName}
+                placeholder="Ex: Jean Dupont"
+                placeholderTextColor="#4B5563"
+              />
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>TÉLÉPHONE</Text>
-              <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Ex: 034 00 000 00" keyboardType="phone-pad" placeholderTextColor="#4B5563" />
+              <TextInput
+                style={styles.input}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="Ex: 034 00 000 00"
+                keyboardType="phone-pad"
+                placeholderTextColor="#4B5563"
+              />
             </View>
 
             <View style={styles.modalButtons}>
@@ -181,11 +208,13 @@ export default function BuyersList() {
                 <Text style={styles.btnTextCancel}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.btnAdd} onPress={handleSaveBuyer}>
-                <Text style={styles.btnTextAdd}>{editingId ? "Mettre à jour" : "Enregistrer"}</Text>
+                <Text style={styles.btnTextAdd}>
+                  {editingId ? "Mettre à jour" : "Enregistrer"}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Delete Confirmation Modal */}
@@ -232,7 +261,17 @@ const styles = StyleSheet.create({
   headerSearchContainer: { flexDirection: 'row', alignItems: 'center', width: width * 0.6, backgroundColor: '#111827', borderRadius: 10, paddingHorizontal: 10, height: 35 },
   headerSearchInput: { flex: 1, color: '#FFF', fontSize: 14 },
   list: { padding: 20, paddingBottom: 100 },
-  card: { backgroundColor: '#111827', padding: 18, borderRadius: 20, marginBottom: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
+
+  card: { 
+    backgroundColor: '#111827', 
+    padding: 18, 
+    borderRadius: 20, 
+    marginBottom: 12, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    borderWidth: 1, 
+    borderColor: '#1E293B' 
+  },
   avatar: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   avatarText: { color: '#6366F1', fontSize: 20, fontWeight: 'bold' },
   info: { flex: 1 },
@@ -241,18 +280,88 @@ const styles = StyleSheet.create({
   phone: { color: '#94A3B8', fontSize: 14 },
   actions: { flexDirection: 'row', gap: 10 },
   actionBtn: { padding: 8, backgroundColor: '#1E293B', borderRadius: 12 },
-  fab: { position: 'absolute', right: 25, bottom: 30, backgroundColor: '#A5B4FC', width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 8 },
+
+  /* FAB - Même style que events.tsx */
+  fab: { 
+    position: 'absolute', 
+    right: 25, 
+    bottom: 110, 
+    backgroundColor: '#A5B4FC', 
+    width: 60, 
+    height: 60, 
+    borderRadius: 30, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    elevation: 8, 
+    shadowColor: '#A5B4FC', 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.3, 
+    shadowRadius: 10 
+  },
+
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 },
   emptyText: { marginTop: 20, fontSize: 16, color: '#64748B' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#111827', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 30, borderTopWidth: 1, borderTopColor: '#1E293B' },
-  modalTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', marginBottom: 25, textAlign: 'center' },
-  inputGroup: { marginBottom: 20 },
+
+  /* Modal Centré */
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.85)', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  modalContent: { 
+    backgroundColor: '#111827', 
+    borderRadius: 24, 
+    padding: 30, 
+    width: '85%', 
+    maxWidth: 420,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  modalTitle: { 
+    color: '#FFFFFF', 
+    fontSize: 22, 
+    fontWeight: '900', 
+    marginBottom: 25, 
+    textAlign: 'center' 
+  },
+  inputGroup: { marginBottom: 20, width: '100%' },
   label: { color: '#6366F1', fontSize: 12, fontWeight: 'bold', marginBottom: 8, letterSpacing: 1 },
-  input: { backgroundColor: '#0F172A', borderRadius: 12, padding: 15, color: '#FFFFFF', fontSize: 16, borderWidth: 1, borderColor: '#1E293B' },
-  modalButtons: { flexDirection: 'row', gap: 15, marginTop: 15 },
-  btnCancel: { flex: 1, padding: 18, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
+  input: { 
+    backgroundColor: '#0F172A', 
+    borderRadius: 12, 
+    padding: 15, 
+    color: '#FFFFFF', 
+    fontSize: 16, 
+    borderWidth: 1, 
+    borderColor: '#1E293B',
+    width: '100%'
+  },
+  modalButtons: { 
+    flexDirection: 'row', 
+    gap: 15, 
+    marginTop: 15,
+    width: '100%'
+  },
+  btnCancel: { 
+    flex: 1, 
+    padding: 18, 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    borderWidth: 1, 
+    borderColor: '#1E293B' 
+  },
   btnTextCancel: { color: '#EF4444', fontWeight: 'bold' },
-  btnAdd: { flex: 2, backgroundColor: '#6366F1', padding: 18, borderRadius: 15, alignItems: 'center' },
+  btnAdd: { 
+    flex: 2, 
+    backgroundColor: '#6366F1', 
+    padding: 18, 
+    borderRadius: 15, 
+    alignItems: 'center' 
+  },
   btnTextAdd: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 }
 });
