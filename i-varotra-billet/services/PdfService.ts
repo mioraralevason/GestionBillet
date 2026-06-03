@@ -33,9 +33,10 @@ const loadImageAsBase64 = async (uri: string): Promise<string | null> => {
     
     let fileUri = uri;
     if (uri.startsWith('content://')) {
+      const cacheDir = (FileSystem as any).cacheDirectory || FileSystem.cacheDirectory;
       const downloadResult = await FileSystem.downloadAsync(
         uri,
-        FileSystem.cacheDirectory + 'temp_image.jpg'
+        cacheDir + 'temp_image.jpg'
       );
       fileUri = downloadResult.uri;
     }
@@ -56,63 +57,45 @@ const loadImageAsBase64 = async (uri: string): Promise<string | null> => {
 
 const compressImageToBase64 = async (uri: string): Promise<string | null> => {
   try {
-    let sourceUri = uri;
-    
     if (uri.startsWith('data:')) {
       const matches = uri.match(/^data:([a-z]+\/[a-z]+);base64,(.*)$/i);
-      if (!matches) return null;
-      const base64Data = matches[2];
-      const tempPath = `${FileSystem.cacheDirectory}temp_data_${Date.now()}.jpg`;
-      await FileSystem.writeAsStringAsync(tempPath, base64Data, { encoding: 'base64' });
-      sourceUri = tempPath;
-    } else if (uri.startsWith('http')) {
-      const tempPath = `${FileSystem.cacheDirectory}temp_remote_${Date.now()}.jpg`;
-      const downloadResult = await FileSystem.downloadAsync(uri, tempPath);
-      sourceUri = downloadResult.uri;
-    } else if (uri.startsWith('content://')) {
-      const tempPath = `${FileSystem.cacheDirectory}temp_content_${Date.now()}.jpg`;
-      const downloadResult = await FileSystem.downloadAsync(uri, tempPath);
-      sourceUri = downloadResult.uri;
+      if (!matches) {
+        console.log('compressImageToBase64 invalid data uri');
+        return null;
+      }
+      return uri;
     }
-    
-    const info = await FileSystem.getInfoAsync(sourceUri);
-    if (!info.exists) {
-      console.log('Image file does not exist after processing:', sourceUri);
-      return null;
-    }
-    
-    const manipulated = await ImageManipulator.manipulateAsync(
-      sourceUri,
-      [{ resize: { width: MAX_IMAGE_SIZE } }],
-      { compress: COMPRESS_QUALITY, format: ImageManipulator.SaveFormat.JPEG }
-    );
-    
-    const base64 = await FileSystem.readAsStringAsync(manipulated.uri, { encoding: 'base64' });
-    return `data:image/jpeg;base64,${base64}`;
-  } catch (e) {
-    console.log('Image compression failed, using original:', e);
-    try {
-      let sourceUri = uri;
-      if (uri.startsWith('data:')) {
-        const matches = uri.match(/^data:([a-z]+\/[a-z]+);base64,(.*)$/i);
-        if (matches) {
-          const base64Data = matches[2];
-          const tempPath = `${FileSystem.cacheDirectory}temp_direct_${Date.now()}.jpg`;
-          await FileSystem.writeAsStringAsync(tempPath, base64Data, { encoding: 'base64' });
-          sourceUri = tempPath;
-        }
-      } else if (uri.startsWith('http')) {
-        const tempPath = `${FileSystem.cacheDirectory}temp_direct_${Date.now()}.jpg`;
+
+    let sourceUri = uri;
+    if (uri.startsWith('content://') || uri.startsWith('http')) {
+      try {
+        const cacheDir = (FileSystem as any).cacheDirectory || FileSystem.cacheDirectory;
+        const tempPath = `${cacheDir}temp_pdf_${Date.now()}.jpg`;
         const downloadResult = await FileSystem.downloadAsync(uri, tempPath);
         sourceUri = downloadResult.uri;
+      } catch (downloadError) {
+        console.log('compressImageToBase64 download failed', downloadError);
+        return null;
       }
-      if (!sourceUri.startsWith('data:')) {
-        const base64 = await FileSystem.readAsStringAsync(sourceUri, { encoding: 'base64' });
-        return `data:image/jpeg;base64,${base64}`;
-      }
-    } catch (fallbackError) {
-      console.log('Fallback also failed:', fallbackError);
     }
+
+    try {
+      const manipulated = await ImageManipulator.manipulateAsync(
+        sourceUri,
+        [{ resize: { width: MAX_IMAGE_SIZE } }],
+        { compress: COMPRESS_QUALITY, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      const base64 = (manipulated as any).base64 || (manipulated as any).base64String || (manipulated as any).base64Data;
+      if (base64) return `data:image/jpeg;base64,${base64}`;
+      const base64Str = await FileSystem.readAsStringAsync(manipulated.uri, { encoding: 'base64' });
+      return `data:image/jpeg;base64,${base64Str}`;
+    } catch (manipulateError) {
+      console.log('compressImageToBase64 manipulation failed, trying direct read', manipulateError);
+      const base64Str = await FileSystem.readAsStringAsync(sourceUri, { encoding: 'base64' });
+      return `data:image/jpeg;base64,${base64Str}`;
+    }
+  } catch (e) {
+    console.log('compressImageToBase64 overall failed:', e);
     return null;
   }
 };
@@ -172,11 +155,7 @@ export const PdfService = {
 
     let eventImageUri = '';
     if (event?.image) {
-      if (event.image.includes('image/svg') || event.image.startsWith('<svg')) {
-        console.log('SVG image not supported for PDF');
-      } else {
-        eventImageUri = await compressImageToBase64(event.image) || '';
-      }
+      eventImageUri = await compressImageToBase64(event.image) || '';
     }
 
     let htmlContent = `<!DOCTYPE html>
