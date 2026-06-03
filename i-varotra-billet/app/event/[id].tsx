@@ -1,26 +1,25 @@
 // app/event/[id].tsx
-import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
-  Modal,
-  useColorScheme
-} from 'react-native';
-import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
-import { EventService, Event } from '../../services/EventService';
-import { TicketService } from '../../services/TicketService';
-import { PdfService, PdfExportOptions } from '../../services/PdfService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
-import { Colors } from '../../constants/theme';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View
+} from 'react-native';
 import ConfirmModal from '../../components/ConfirmModal';
-import { showSuccess, showError, showWarning, showInfo } from '../../utils/toast';
+import { Colors } from '../../constants/theme';
+import { Event, EventService } from '../../services/EventService';
+import { PdfExportOptions, PdfService } from '../../services/PdfService';
+import { TicketService } from '../../services/TicketService';
+import { showSuccess, showWarning } from '../../utils/toast';
 
 /**
  * Screen displaying detailed information about a specific event.
