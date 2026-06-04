@@ -106,7 +106,7 @@ export default function AddEventCarousel() {
       const width = 250;
       const height = 350;
       
-      const uri = `data:image/svg+xml;base64,${btoa(`
+      const svgString = `
         <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
           <defs>
             ${templateNum === 1 ? `
@@ -142,8 +142,10 @@ export default function AddEventCarousel() {
             <circle cx="30" cy="150" r="1.5" fill="white" opacity="0.5"/>
           ` : ''}
         </svg>
-      `)}`;
-      
+      `;
+
+      const encoded = btoa(unescape(encodeURIComponent(svgString)));
+      const uri = `data:image/svg+xml;base64,${encoded}`;
       setImage(uri);
     } catch (error) {
       console.error('Error generating template:', error);

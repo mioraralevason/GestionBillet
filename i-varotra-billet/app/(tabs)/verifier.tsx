@@ -1,120 +1,190 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  Platform,
+  Animated,
+} from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AttendanceService, ValidationResult } from '../../services/AttendanceService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Stack } from 'expo-router';
+
+const SURFACE = '#111827';
+const SURFACE2 = '#1E293B';
+const TEXT = '#FFFFFF';
+const TEXT2 = '#94A3B8';
+const SUCCESS = '#10B981';
+const WARNING = '#F59E0B';
+const DANGER = '#EF4444';
+const ACCENT = '#6366F1';
+
+// ─── Permission screen ────────────────────────────────────────────────────────
+
+function PermissionScreen({ onRequest }: { onRequest: () => void }) {
+  return (
+    <SafeAreaView style={styles.permScreen}>
+      <View style={styles.permIconWrap}>
+        <MaterialCommunityIcons name="camera-outline" size={56} color={ACCENT} />
+      </View>
+      <Text style={styles.permTitle}>Accès caméra requis</Text>
+      <Text style={styles.permSub}>
+        Pour scanner les QR codes des billets, l'application a besoin d'accéder à votre caméra.
+      </Text>
+      <TouchableOpacity style={styles.permBtn} onPress={onRequest} activeOpacity={0.8}>
+        <MaterialCommunityIcons name="camera" size={20} color="#000" />
+        <Text style={styles.permBtnText}>Autoriser l'accès</Text>
+      </TouchableOpacity>
+    </SafeAreaView>
+  );
+}
+
+// ─── Scan result card ─────────────────────────────────────────────────────────
+
+interface ResultCardProps {
+  result: ValidationResult;
+  onClose: () => void;
+}
+
+function ResultCard({ result, onClose }: ResultCardProps) {
+  const isSuccess = result.success;
+  const isWarning = result.warning && !result.success;
+  const color = isSuccess ? SUCCESS : isWarning ? WARNING : DANGER;
+
+  const icon: any = isSuccess ? 'check-circle' : isWarning ? 'alert-circle' : 'close-circle';
+  const title = isSuccess ? 'BILLET VALIDE' : isWarning ? 'DEJA UTILISE' : 'INVALIDE';
+
+  return (
+    <View style={[styles.resultCard, { borderColor: color + '60' }]}>
+      {/* Status icon */}
+      <View style={[styles.resultIconCircle, { backgroundColor: color + '20' }]}>
+        <MaterialCommunityIcons name={icon} size={44} color={color} />
+      </View>
+
+      <Text style={[styles.resultTitle, { color }]}>{title}</Text>
+      <Text style={styles.resultMessage}>{result.message}</Text>
+
+      {/* Ticket info rows */}
+      {result.ticket && (
+        <View style={styles.infoBox}>
+          <InfoRow icon="ticket-outline" value={result.ticket.ticket_number} />
+          <InfoRow icon="calendar-outline" value={result.ticket.event_name} />
+          {result.ticket.buyer_name && (
+            <InfoRow icon="account-outline" value={result.ticket.buyer_name} last />
+          )}
+        </View>
+      )}
+
+      <TouchableOpacity style={[styles.scanAgainBtn, { backgroundColor: ACCENT }]} onPress={onClose} activeOpacity={0.85}>
+        <MaterialCommunityIcons name="qrcode-scan" size={18} color={TEXT} />
+        <Text style={styles.scanAgainText}>Scanner un autre billet</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function InfoRow({ icon, value, last }: { icon: any; value: string; last?: boolean }) {
+  return (
+    <View style={[styles.infoRow, !last && styles.infoRowBorder]}>
+      <MaterialCommunityIcons name={icon} size={16} color={TEXT2} />
+      <Text style={styles.infoValue} numberOfLines={1}>{value}</Text>
+    </View>
+  );
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function Verifier() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [result, setResult] = useState<ValidationResult | null>(null);
 
-  useEffect(() => {
-    if (!permission) {
-      requestPermission();
-    }
-  }, [permission]);
-
-  const handleBarCodeScanned = async ({ data }: { data: string }) => {
+  const handleBarCodeScanned = useCallback(async ({ data }: { data: string }) => {
     if (scanned) return;
     setScanned(true);
-    
+
     const validation = AttendanceService.validateTicket(data);
     setResult(validation);
 
-    if (validation.success) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } else if (validation.warning) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    if (Platform.OS !== 'web') {
+      if (validation.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else if (validation.warning) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     }
-  };
+  }, [scanned]);
 
-  const closeResult = () => {
+  const closeResult = useCallback(() => {
     setResult(null);
     setScanned(false);
-  };
+  }, []);
 
   if (!permission) {
-    return <View style={styles.center}><Text>Vérification des permissions...</Text></View>;
-  }
-  
-  if (!permission.granted) {
     return (
-      <View style={styles.center}>
-        <Text style={{ marginBottom: 20 }}>L'accès à la caméra est requis pour scanner les billets.</Text>
-        <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
-          <Text style={styles.permissionBtnText}>Autoriser l'accès</Text>
-        </TouchableOpacity>
+      <View style={styles.loadingScreen}>
+        <MaterialCommunityIcons name="camera-outline" size={32} color={TEXT2} />
+        <Text style={styles.loadingText}>Vérification des permissions...</Text>
       </View>
     );
   }
 
+  if (!permission.granted) {
+    return <PermissionScreen onRequest={requestPermission} />;
+  }
+
   return (
     <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+
       <CameraView
         style={StyleSheet.absoluteFillObject}
-        barcodeScannerSettings={{
-          barcodeTypes: ["qr"],
-        }}
+        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
       />
-      
-      <View style={styles.overlay}>
-        <View style={styles.scanArea}>
-          <View style={styles.scanCornerTL} />
-          <View style={styles.scanCornerTR} />
-          <View style={styles.scanCornerBL} />
-          <View style={styles.scanCornerBR} />
+
+      {/* Dimmed overlay with cutout feel */}
+      <View style={styles.overlayTop} />
+      <View style={styles.overlayMiddle}>
+        <View style={styles.overlaySide} />
+
+        {/* Scan frame */}
+        <View style={styles.scanFrame}>
+          {/* Corners */}
+          <View style={[styles.corner, styles.cornerTL]} />
+          <View style={[styles.corner, styles.cornerTR]} />
+          <View style={[styles.corner, styles.cornerBL]} />
+          <View style={[styles.corner, styles.cornerBR]} />
+
+          {/* Scan line hint */}
+          {!scanned && (
+            <View style={styles.scanLineHint} />
+          )}
         </View>
-        <Text style={styles.instruction}>Scannez le QR Code du billet</Text>
+
+        <View style={styles.overlaySide} />
+      </View>
+      <View style={styles.overlayBottom}>
+        <Text style={styles.instruction}>
+          {scanned ? 'Traitement en cours...' : 'Placez le QR code dans le cadre'}
+        </Text>
+        <Text style={styles.instructionSub}>Scan automatique</Text>
       </View>
 
-      <Modal visible={result !== null} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[
-            styles.modalContent,
-            result?.success ? styles.successBorder : (result?.warning ? styles.warningBorder : styles.errorBorder)
-          ]}>
-            <View style={[
-              styles.iconContainer,
-              result?.success ? styles.successBg : (result?.warning ? styles.warningBg : styles.errorBg)
-            ]}>
-              <MaterialCommunityIcons
-                name={result?.success ? "check" : (result?.warning ? "alert" : "close")}
-                size={40}
-                color="#FFF"
-              />
-            </View>
-            
-            <Text style={styles.modalTitle}>{result?.success ? "BILLET VALIDE" : (result?.warning ? "DÉJÀ UTILISÉ" : "INVALIDE")}</Text>
-            <Text style={styles.modalMessage}>{result?.message}</Text>
-
-            {result?.ticket && (
-              <View style={styles.ticketInfo}>
-                <View style={styles.ticketInfoRow}>
-                  <MaterialCommunityIcons name="ticket-outline" size={18} color="#94A3B8" />
-                  <Text style={styles.ticketText}>{result.ticket.ticket_number}</Text>
-                </View>
-                <View style={styles.ticketInfoRow}>
-                  <MaterialCommunityIcons name="calendar" size={18} color="#94A3B8" />
-                  <Text style={styles.ticketText}>{result.ticket.event_name}</Text>
-                </View>
-                {result.ticket.buyer_name && (
-                  <View style={styles.ticketInfoRow}>
-                    <MaterialCommunityIcons name="account" size={18} color="#94A3B8" />
-                    <Text style={styles.ticketText}>{result.ticket.buyer_name}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            <TouchableOpacity style={styles.closeButton} onPress={closeResult}>
-              <MaterialCommunityIcons name="qrcode-scan" size={20} color="#FFF" />
-              <Text style={styles.closeButtonText}>Scanner un autre billet</Text>
-            </TouchableOpacity>
+      {/* Result modal */}
+      <Modal visible={result !== null} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            {/* Drag handle */}
+            <View style={styles.dragHandle} />
+            {result && <ResultCard result={result} onClose={closeResult} />}
           </View>
         </View>
       </Modal>
@@ -122,32 +192,240 @@ export default function Verifier() {
   );
 }
 
+const CORNER_SIZE = 24;
+const CORNER_WEIGHT = 3;
+const FRAME_SIZE = 240;
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' },
-  scanArea: { width: 250, height: 250, position: 'relative' },
-  scanCornerTL: { position: 'absolute', top: 0, left: 0, width: 40, height: 40, borderColor: '#007AFF', borderLeftWidth: 4, borderTopWidth: 4, borderTopLeftRadius: 20 },
-  scanCornerTR: { position: 'absolute', top: 0, right: 0, width: 40, height: 40, borderColor: '#007AFF', borderRightWidth: 4, borderTopWidth: 4, borderTopRightRadius: 20 },
-  scanCornerBL: { position: 'absolute', bottom: 0, left: 0, width: 40, height: 40, borderColor: '#007AFF', borderLeftWidth: 4, borderBottomWidth: 4, borderBottomLeftRadius: 20 },
-  scanCornerBR: { position: 'absolute', bottom: 0, right: 0, width: 40, height: 40, borderColor: '#007AFF', borderRightWidth: 4, borderBottomWidth: 4, borderBottomRightRadius: 20 },
-  instruction: { marginTop: 40, color: '#FFF', fontSize: 18, fontWeight: 'bold', textShadowColor: '#000', textShadowRadius: 10, textShadowOffset: { width: 1, height: 1 } },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 25 },
-  modalContent: { backgroundColor: '#111827', borderRadius: 24, padding: 30, alignItems: 'center', borderWidth: 1 },
-  successBorder: { borderColor: '#34C759' },
-  warningBorder: { borderColor: '#FF9500' },
-  errorBorder: { borderColor: '#FF3B30' },
-  iconContainer: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-  successBg: { backgroundColor: '#34C759' },
-  warningBg: { backgroundColor: '#FF9500' },
-  errorBg: { backgroundColor: '#FF3B30' },
-  modalTitle: { color: '#FFF', fontSize: 22, fontWeight: '900', marginBottom: 8, letterSpacing: 0.5 },
-  modalMessage: { color: '#94A3B8', fontSize: 15, textAlign: 'center', marginBottom: 20, lineHeight: 22 },
-  ticketInfo: { backgroundColor: '#1E293B', padding: 18, borderRadius: 16, width: '100%', marginBottom: 20, borderWidth: 1, borderColor: '#1E293B' },
-  ticketInfoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 },
-  ticketText: { color: '#E2E8F0', fontSize: 14, flex: 1 },
-  closeButton: { backgroundColor: '#6366F1', flexDirection: 'row', paddingHorizontal: 25, paddingVertical: 16, borderRadius: 16, alignItems: 'center', gap: 10, width: '100%', justifyContent: 'center' },
-  closeButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  permissionBtn: { backgroundColor: '#007AFF', paddingHorizontal: 30, paddingVertical: 15, borderRadius: 12 },
-  permissionBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' }
+
+  // Permission screen
+  permScreen: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  permIconWrap: {
+    width: 100,
+    height: 100,
+    borderRadius: 28,
+    backgroundColor: SURFACE,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 28,
+    borderWidth: 1,
+    borderColor: SURFACE2,
+  },
+  permTitle: {
+    color: TEXT,
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  permSub: {
+    color: TEXT2,
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 36,
+  },
+  permBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#A5B4FC',
+    paddingHorizontal: 28,
+    paddingVertical: 16,
+    borderRadius: 16,
+  },
+  permBtnText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  // Loading
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 14,
+  },
+  loadingText: { color: TEXT2, fontSize: 15 },
+
+  // Camera overlay layers
+  overlayTop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  overlayMiddle: {
+    flexDirection: 'row',
+    height: FRAME_SIZE,
+  },
+  overlaySide: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  overlayBottom: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    paddingTop: 32,
+  },
+
+  // Scan frame
+  scanFrame: {
+    width: FRAME_SIZE,
+    height: FRAME_SIZE,
+    position: 'relative',
+  },
+  corner: {
+    position: 'absolute',
+    width: CORNER_SIZE,
+    height: CORNER_SIZE,
+    borderColor: '#A5B4FC',
+  },
+  cornerTL: {
+    top: 0, left: 0,
+    borderTopWidth: CORNER_WEIGHT, borderLeftWidth: CORNER_WEIGHT,
+    borderTopLeftRadius: 6,
+  },
+  cornerTR: {
+    top: 0, right: 0,
+    borderTopWidth: CORNER_WEIGHT, borderRightWidth: CORNER_WEIGHT,
+    borderTopRightRadius: 6,
+  },
+  cornerBL: {
+    bottom: 0, left: 0,
+    borderBottomWidth: CORNER_WEIGHT, borderLeftWidth: CORNER_WEIGHT,
+    borderBottomLeftRadius: 6,
+  },
+  cornerBR: {
+    bottom: 0, right: 0,
+    borderBottomWidth: CORNER_WEIGHT, borderRightWidth: CORNER_WEIGHT,
+    borderBottomRightRadius: 6,
+  },
+  scanLineHint: {
+    position: 'absolute',
+    top: '50%',
+    left: 8,
+    right: 8,
+    height: 1.5,
+    backgroundColor: 'rgba(165,180,252,0.4)',
+    borderRadius: 1,
+  },
+
+  instruction: {
+    color: TEXT,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  instructionSub: {
+    color: TEXT2,
+    fontSize: 13,
+    textAlign: 'center',
+  },
+
+  // Result modal
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  modalSheet: {
+    backgroundColor: SURFACE,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingBottom: 36,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderColor: SURFACE2,
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: SURFACE2,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+
+  // Result card
+  resultCard: {
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 24,
+  },
+  resultIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  resultTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  resultMessage: {
+    color: TEXT2,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+    paddingHorizontal: 8,
+  },
+
+  // Info box inside result
+  infoBox: {
+    width: '100%',
+    backgroundColor: SURFACE2,
+    borderRadius: 14,
+    marginBottom: 20,
+    overflow: 'hidden',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  infoRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#0F172A',
+  },
+  infoValue: {
+    color: TEXT,
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+
+  // Scan again button
+  scanAgainBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 16,
+  },
+  scanAgainText: {
+    color: TEXT,
+    fontSize: 15,
+    fontWeight: '700',
+  },
 });

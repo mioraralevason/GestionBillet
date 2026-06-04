@@ -1,296 +1,415 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  SafeAreaView, 
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  FlatList,
+  TouchableOpacity,
   RefreshControl,
-  useColorScheme,
   StatusBar,
-  TextInput,
-  Platform,
   Dimensions,
-  Modal
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, Stack } from 'expo-router';
 import { EventService, Event } from '../../services/EventService';
 import { TicketService } from '../../services/TicketService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors } from '../../constants/theme';
+import { useRole } from '../../hooks/useRole';
+import EventCard from '../../components/EventCard';
+import { IconButton } from '../../components/ui/IconButton';
+import MonthYearPicker from '../../components/Pickers/MonthYearPicker';
 
 const { width } = Dimensions.get('window');
+const CARD_WIDTH = width - 40;
 
-const MonthYearPicker = ({ visible, onClose, onSelect, value }: any) => {
-  const [selectedYear, setSelectedYear] = useState(value ? value.getFullYear() : new Date().getFullYear());
-  
-  useEffect(() => {
-    if (value) setSelectedYear(value.getFullYear());
-  }, [value, visible]);
+// ─── KPI Card ───────────────────────────────────────────────────────────────
 
-  const months = [
-    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
-    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
-  ];
+interface KpiCardProps {
+  eventCount: number;
+  soldTickets: number;
+  fillPercent: number;
+}
 
-  return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
-        <View style={styles.pickerCard}>
-          <Text style={styles.pickerTitle}>Choisir un mois</Text>
-          <View style={styles.yearSelector}>
-            <TouchableOpacity onPress={() => setSelectedYear(selectedYear - 1)}>
-              <MaterialCommunityIcons name="chevron-left" size={32} color="#6366F1" />
-            </TouchableOpacity>
-            <Text style={styles.yearText}>{selectedYear}</Text>
-            <TouchableOpacity onPress={() => setSelectedYear(selectedYear + 1)}>
-              <MaterialCommunityIcons name="chevron-right" size={32} color="#6366F1" />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.monthsGrid}>
-            {months.map((month, index) => {
-              const isSelected = value && value.getMonth() === index && value.getFullYear() === selectedYear;
-              return (
-                <TouchableOpacity 
-                  key={month} 
-                  style={[styles.monthItem, isSelected && styles.monthItemActive]}
-                  onPress={() => {
-                    const date = new Date(selectedYear, index, 1);
-                    onSelect(date);
-                    onClose();
-                  }}
-                >
-                  <Text style={[styles.monthText, isSelected && styles.monthTextActive]}>
-                    {month.substring(0, 4)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          <TouchableOpacity style={styles.closePickerBtn} onPress={onClose}>
-            <Text style={styles.closePickerBtnText}>Fermer</Text>
-          </TouchableOpacity>
-        </View>
+const KpiCard: React.FC<KpiCardProps> = ({ eventCount, soldTickets, fillPercent }) => (
+  <View style={styles.kpiCard}>
+    <View style={styles.kpiMain}>
+      <Text style={styles.kpiLabel}>Événements</Text>
+      <Text style={styles.kpiValue}>{eventCount}</Text>
+    </View>
+
+    <View style={styles.kpiDivider} />
+
+    <View style={styles.kpiRow}>
+      <View style={styles.kpiItem}>
+        <MaterialCommunityIcons name="ticket-confirmation-outline" size={20} color="rgba(255,255,255,0.7)" />
+        <Text style={styles.kpiItemValue}>{soldTickets}</Text>
+        <Text style={styles.kpiItemLabel}>Billets vendus</Text>
       </View>
-    </Modal>
-  );
+      <View style={styles.kpiItemSeparator} />
+      <View style={styles.kpiItem}>
+        <MaterialCommunityIcons name="chart-pie" size={20} color="rgba(255,255,255,0.7)" />
+        <Text style={styles.kpiItemValue}>{fillPercent}%</Text>
+        <Text style={styles.kpiItemLabel}>Remplissage</Text>
+      </View>
+    </View>
+
+    <View style={styles.progressTrack}>
+      <View style={[styles.progressFill, { width: `${Math.min(fillPercent, 100)}%` as any }]} />
+    </View>
+  </View>
+);
+
+// ─── Period Filter ──────────────────────────────────────────────────────────
+
+const formatPeriod = (date: Date | null): string => {
+  if (!date) return 'MM/AAAA';
+  const m = date.toLocaleDateString('fr-FR', { month: 'short' });
+  return `${m.charAt(0).toUpperCase() + m.slice(1)} ${date.getFullYear()}`;
 };
 
+const dateVal = (d: Date | null) => (d ? d.getFullYear() * 12 + d.getMonth() : null);
+
+// ─── Home Screen ────────────────────────────────────────────────────────────
+
 export default function Home() {
-  const colorScheme = useColorScheme() || 'dark';
-  const theme = Colors[colorScheme];
+  const router = useRouter();
+  const { role } = useRole();
   const currentYear = new Date().getFullYear();
-  
-  const [role, setRole] = useState('');
+
   const [events, setEvents] = useState<Event[]>([]);
   const [recentCreations, setRecentCreations] = useState<Event[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [startMonthYear, setStartMonthYear] = useState<Date | null>(new Date(currentYear, 0, 1));
-  const [endMonthYear, setEndMonthYear] = useState<Date | null>(new Date(currentYear, 11, 1));
+  const [startDate, setStartDate] = useState<Date | null>(new Date(currentYear, 0, 1));
+  const [endDate, setEndDate] = useState<Date | null>(new Date(currentYear, 11, 1));
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-  
-  const router = useRouter();
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const historyRef = useRef<FlatList>(null);
 
   const fetchData = useCallback(async () => {
-    const userRole = await AsyncStorage.getItem('userRole');
-    setRole(userRole || 'Utilisateur');
-    const allEvents = EventService.getEvents();
-    setEvents(allEvents);
-    const recent = EventService.getRecentCreations();
-    setRecentCreations(recent);
+    setEvents(EventService.getEvents());
+    setRecentCreations(EventService.getRecentCreations());
   }, []);
 
   useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchData();
     setRefreshing(false);
-  };
+  }, [fetchData]);
 
-  const filteredData = useMemo(() => {
-    let filteredEvents = events;
-    if (startMonthYear && endMonthYear) {
-      const startVal = startMonthYear.getFullYear() * 12 + startMonthYear.getMonth();
-      const endVal = endMonthYear.getFullYear() * 12 + endMonthYear.getMonth();
-      filteredEvents = events.filter(e => {
-        const d = new Date(e.event_date);
-        const currentVal = d.getFullYear() * 12 + d.getMonth();
-        return currentVal >= startVal && currentVal <= endVal;
-      });
-    }
-    
-    // Historique des créations filtré par la même période
-    let filteredHistory = recentCreations;
-    if (startMonthYear && endMonthYear) {
-        const startVal = startMonthYear.getFullYear() * 12 + startMonthYear.getMonth();
-        const endVal = endMonthYear.getFullYear() * 12 + endMonthYear.getMonth();
-        filteredHistory = recentCreations.filter(e => {
-            const d = e.created_at ? new Date(e.created_at) : new Date();
-            const val = d.getFullYear() * 12 + d.getMonth();
-            return val >= startVal && val <= endVal;
-        });
-    }
+  // Filter events & history by period
+  const { filteredEvents, filteredHistory } = useMemo(() => {
+    const startV = dateVal(startDate);
+    const endV = dateVal(endDate);
+
+    const inRange = (dateStr: string) => {
+      try {
+        const d = new Date(dateStr);
+        const v = d.getFullYear() * 12 + d.getMonth();
+        return startV == null || endV == null || (v >= startV && v <= endV);
+      } catch {
+        return true;
+      }
+    };
+
+    const filteredEvents = startV == null ? events : events.filter(e => inRange(e.event_date));
+    const filteredHistory = startV == null ? recentCreations : recentCreations.filter(e => inRange(e.created_at || e.event_date));
 
     return { filteredEvents, filteredHistory };
-  }, [startMonthYear, endMonthYear, events, recentCreations]);
+  }, [events, recentCreations, startDate, endDate]);
 
-  const soldTickets = filteredData.filteredEvents.reduce((acc, e) => {
-    const stats = TicketService.getEventStats(e.id!);
-    return acc + stats.sold + stats.validated;
-  }, 0);
+  // KPI calculations
+  const { soldTickets, totalTickets } = useMemo(() => {
+    let sold = 0;
+    let total = 0;
+    filteredEvents.forEach(e => {
+      const s = TicketService.getEventStats(e.id!);
+      sold += s.sold + s.validated;
+      total += s.total;
+    });
+    return { soldTickets: sold, totalTickets: total };
+  }, [filteredEvents]);
 
-  const totalPossibleTickets = filteredData.filteredEvents.reduce((acc, e) => {
-    const stats = TicketService.getEventStats(e.id!);
-    return acc + stats.total;
-  }, 0);
+  const fillPercent = totalTickets > 0 ? Math.round((soldTickets / totalTickets) * 100) : 0;
 
-  const formatMonthYear = (date: Date | null) => {
-    if (!date) return 'MM/AAAA';
-    const m = date.toLocaleDateString('fr-FR', { month: 'long' });
-    return `${m.charAt(0).toUpperCase() + m.slice(1)} ${date.getFullYear()}`;
-  };
+  // Add stats to history items for EventCard
+  const historyWithStats = useMemo(() =>
+    filteredHistory.map(e => ({ ...e, stats: TicketService.getEventStats(e.id!) })),
+    [filteredHistory]
+  );
+
+  const resetPeriod = useCallback(() => {
+    setStartDate(new Date(currentYear, 0, 1));
+    setEndDate(new Date(currentYear, 11, 1));
+  }, [currentYear]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#000000' }]}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <Stack.Screen 
+      <Stack.Screen
         options={{
           headerTitle: 'iBillet',
           headerRight: () => (
-            <TouchableOpacity 
-              onPress={() => router.push({ pathname: '/(tabs)/events', params: { autoSearch: 'true' } })} 
-              style={{ marginRight: 20 }}
-            >
-              <MaterialCommunityIcons name="magnify" size={26} color="#FFFFFF" />
-            </TouchableOpacity>
-          )
+            <IconButton
+              icon="magnify"
+              onPress={() => router.push('/(tabs)/events' as any)}
+              style={{ marginRight: 12 }}
+              color="#FFFFFF"
+            />
+          ),
         }}
       />
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.tint} />}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366F1" />}
       >
-        <View style={styles.content}>
-          <Text style={styles.welcomeText}>Agent iBillet</Text>
-
-          <View style={styles.dateFilterContainer}>
-            <View style={styles.datePickerRow}>
-              <TouchableOpacity style={[styles.dateBtn, styles.dateBtnActive]} onPress={() => setShowStartPicker(true)}>
-                <MaterialCommunityIcons name="calendar-import" size={18} color="#A5B4FC" />
-                <Text style={styles.dateBtnText}>{formatMonthYear(startMonthYear)}</Text>
-              </TouchableOpacity>
-              <MaterialCommunityIcons name="arrow-right" size={16} color="#4B5563" />
-              <TouchableOpacity style={[styles.dateBtn, styles.dateBtnActive]} onPress={() => setShowEndPicker(true)}>
-                <MaterialCommunityIcons name="calendar-export" size={18} color="#A5B4FC" />
-                <Text style={styles.dateBtnText}>{formatMonthYear(endMonthYear)}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.resetBtn} onPress={() => { setStartMonthYear(new Date(currentYear, 0, 1)); setEndMonthYear(new Date(currentYear, 11, 1)); }}>
-                <MaterialCommunityIcons name="refresh" size={20} color="#6366F1" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.dateHint}>Période : Janv. - Déc. {currentYear}</Text>
+        {/* Greeting */}
+        <View style={styles.greetingRow}>
+          <View>
+            <Text style={styles.greetingLabel}>Tableau de bord</Text>
+            <Text style={styles.greetingName}>Agent iBillet</Text>
           </View>
-
-          <MonthYearPicker visible={showStartPicker} onClose={() => setShowStartPicker(false)} onSelect={setStartMonthYear} value={startMonthYear} />
-          <MonthYearPicker visible={showEndPicker} onClose={() => setShowEndPicker(false)} onSelect={setEndMonthYear} value={endMonthYear} />
-
-          <View style={styles.mainCard}>
-            <Text style={styles.mainCardLabel}>Événements trouvés</Text>
-            <Text style={styles.mainCardValue}>{filteredData.filteredEvents.length}</Text>
-            <View style={styles.cardDivider} />
-            <View style={styles.cardFooter}>
-              <View style={styles.cardFooterItem}>
-                <Text style={styles.footerLabel}>Billets vendus</Text>
-                <Text style={styles.footerValue}>{soldTickets}</Text>
-              </View>
-              <View style={styles.cardFooterItem}>
-                <Text style={styles.footerLabel}>Remplissage</Text>
-                <Text style={styles.footerValue}>{totalPossibleTickets > 0 ? Math.round((soldTickets / totalPossibleTickets) * 100) : 0}%</Text>
-              </View>
-            </View>
+          <View style={styles.greetingBadge}>
+            <MaterialCommunityIcons name="shield-check" size={16} color="#6366F1" />
+            <Text style={styles.greetingRole}>{role === 'admin' ? 'Admin' : 'Vérif.'}</Text>
           </View>
-
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Historique d'événements</Text>
-            <TouchableOpacity onPress={() => router.push('/events')}>
-              <Text style={styles.viewAllText}>Voir tout</Text>
-            </TouchableOpacity>
-          </View>
-
-          {filteredData.filteredHistory.length > 0 ? (
-            filteredData.filteredHistory.map((event, index) => (
-              <TouchableOpacity key={index} style={styles.operationItem} onPress={() => router.push(`/event/${event.id}`)}>
-                <View style={[styles.operationIconContainer, { borderColor: event.color || '#A5B4FC' }]}>
-                  <MaterialCommunityIcons name="calendar-plus" size={22} color={event.color || "#A5B4FC"} />
-                </View>
-                <View style={styles.operationContent}>
-                  <Text style={styles.operationTitle}>{event.name}</Text>
-                  <Text style={styles.operationSubtitle}>
-                    Créé le {new Date(event.created_at || '').toLocaleDateString('fr-FR')} pour le {new Date(event.event_date).toLocaleDateString('fr-FR')}
-                  </Text>
-                </View>
-                <View style={styles.timeContainer}>
-                  <Text style={styles.timeText}>
-                    {event.created_at ? new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <Text style={styles.emptyText}>Aucun événement créé sur cette période</Text>
-          )}
         </View>
+
+        {/* Period Filter */}
+        <View style={styles.filterRow}>
+          <TouchableOpacity style={styles.filterBtn} onPress={() => setShowStartPicker(true)} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="calendar-import" size={15} color="#94A3B8" />
+            <Text style={styles.filterBtnText}>{formatPeriod(startDate)}</Text>
+          </TouchableOpacity>
+
+          <MaterialCommunityIcons name="arrow-right" size={14} color="#334155" />
+
+          <TouchableOpacity style={styles.filterBtn} onPress={() => setShowEndPicker(true)} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="calendar-export" size={15} color="#94A3B8" />
+            <Text style={styles.filterBtnText}>{formatPeriod(endDate)}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.resetBtn} onPress={resetPeriod} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <MaterialCommunityIcons name="refresh" size={18} color="#6366F1" />
+          </TouchableOpacity>
+        </View>
+
+        {/* KPI Card */}
+        <KpiCard
+          eventCount={filteredEvents.length}
+          soldTickets={soldTickets}
+          fillPercent={fillPercent}
+        />
+
+        {/* Historique Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Historique</Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/events' as any)} activeOpacity={0.7}>
+            <Text style={styles.sectionLink}>Voir tout</Text>
+          </TouchableOpacity>
+        </View>
+
+        {historyWithStats.length === 0 ? (
+          <View style={styles.emptyHistory}>
+            <MaterialCommunityIcons name="calendar-blank-outline" size={40} color="#1E293B" />
+            <Text style={styles.emptyText}>Aucun événement sur cette période</Text>
+          </View>
+        ) : (
+          <>
+            <FlatList
+              ref={historyRef}
+              data={historyWithStats}
+              keyExtractor={item => item.id?.toString() ?? ''}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={CARD_WIDTH + 12}
+              decelerationRate="fast"
+              contentContainerStyle={styles.historyList}
+              scrollEnabled
+              onMomentumScrollEnd={e => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + 12));
+                setHistoryIndex(idx);
+              }}
+              renderItem={({ item }) => (
+                <View style={styles.historyItem}>
+                  <EventCard
+                    event={item}
+                    onPress={() => router.push(`/event/${item.id}`)}
+                    showActions={false}
+                  />
+                </View>
+              )}
+            />
+
+            {historyWithStats.length > 1 && (
+              <View style={styles.pagination}>
+                {historyWithStats.map((_, i) => (
+                  <View
+                    key={i}
+                    style={[styles.dot, i === historyIndex && styles.dotActive]}
+                  />
+                ))}
+              </View>
+            )}
+          </>
+        )}
       </ScrollView>
+
+      {/* Pickers */}
+      <MonthYearPicker
+        visible={showStartPicker}
+        onClose={() => setShowStartPicker(false)}
+        onSelect={setStartDate}
+        value={startDate}
+      />
+      <MonthYearPicker
+        visible={showEndPicker}
+        onClose={() => setShowEndPicker(false)}
+        onSelect={setEndDate}
+        value={endDate}
+      />
     </SafeAreaView>
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scroll: { paddingBottom: 120 },
-  content: { padding: 20 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
-  pickerCard: { backgroundColor: '#111827', width: width * 0.85, borderRadius: 25, padding: 20, borderWidth: 1, borderColor: '#1E293B' },
-  pickerTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
-  yearSelector: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 30, marginBottom: 25 },
-  yearText: { color: '#FFF', fontSize: 26, fontWeight: '900' },
-  monthsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  monthItem: { width: '30%', backgroundColor: '#1E293B', paddingVertical: 15, borderRadius: 15, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
-  monthItemActive: { backgroundColor: '#6366F1', borderColor: '#818CF8' },
-  monthText: { color: '#94A3B8', fontWeight: 'bold', fontSize: 14 },
-  monthTextActive: { color: '#FFF' },
-  closePickerBtn: { marginTop: 10, padding: 10, alignItems: 'center' },
-  closePickerBtnText: { color: '#64748B', fontWeight: 'bold' },
-  welcomeText: { color: '#FFFFFF', fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-  dateFilterContainer: { marginBottom: 25 },
-  datePickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  dateBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#111827', borderRadius: 12, padding: 12, gap: 8, borderWidth: 1, borderColor: '#1E293B' },
-  dateBtnActive: { borderColor: '#334155' },
-  dateBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
-  dateHint: { color: '#4B5563', fontSize: 11, marginTop: 5, marginLeft: 5 },
-  resetBtn: { padding: 10, backgroundColor: '#6366F115', borderRadius: 10 },
-  mainCard: { backgroundColor: '#6366F1', borderRadius: 25, padding: 25, paddingVertical: 35, marginBottom: 30, elevation: 10 },
-  mainCardLabel: { color: '#E0E7FF', fontSize: 14, textAlign: 'center', marginBottom: 10 },
-  mainCardValue: { color: '#FFFFFF', fontSize: 48, fontWeight: 'bold', textAlign: 'center' },
-  cardDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 25 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-around' },
-  cardFooterItem: { alignItems: 'center' },
-  footerLabel: { color: '#E0E7FF', fontSize: 12, marginBottom: 5 },
-  footerValue: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-  sectionTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  viewAllText: { color: '#6366F1', fontSize: 14, fontWeight: 'bold' },
-  operationItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#1E293B' },
-  operationIconContainer: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: '#334155', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  operationContent: { flex: 1 },
-  operationTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-  operationSubtitle: { color: '#94A3B8', fontSize: 12 },
-  timeContainer: { paddingLeft: 10 },
-  timeText: { color: '#94A3B8', fontSize: 12, fontWeight: 'bold' },
-  emptyText: { color: '#64748B', textAlign: 'center', marginTop: 20, fontStyle: 'italic' }
+  container: { flex: 1, backgroundColor: '#000000' },
+  scroll: { paddingBottom: 130 },
+
+  // Greeting
+  greetingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  greetingLabel: { color: '#4B5563', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 },
+  greetingName: { color: '#FFFFFF', fontSize: 22, fontWeight: '800' },
+  greetingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(99,102,241,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(99,102,241,0.25)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  greetingRole: { color: '#818CF8', fontSize: 12, fontWeight: '700' },
+
+  // Period filter
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  filterBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#111827',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  filterBtnText: { color: '#E2E8F0', fontSize: 12, fontWeight: '600', flex: 1 },
+  resetBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(99,102,241,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // KPI Card
+  kpiCard: {
+    marginHorizontal: 20,
+    marginBottom: 24,
+    backgroundColor: '#6366F1',
+    borderRadius: 20,
+    padding: 22,
+  },
+  kpiMain: { alignItems: 'center', marginBottom: 8 },
+  kpiLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  kpiValue: { color: '#FFFFFF', fontSize: 52, fontWeight: '900', lineHeight: 56 },
+  kpiDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginVertical: 16 },
+  kpiRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 },
+  kpiItem: { alignItems: 'center', gap: 4 },
+  kpiItemValue: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  kpiItemLabel: { color: 'rgba(255,255,255,0.65)', fontSize: 11, fontWeight: '500' },
+  kpiItemSeparator: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)' },
+  progressTrack: { height: 4, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: '#FFFFFF', borderRadius: 2 },
+
+  // Section header
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  sectionTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  sectionLink: { color: '#6366F1', fontSize: 13, fontWeight: '600' },
+
+  // History list
+  historyList: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  historyItem: {
+    width: CARD_WIDTH,
+  },
+
+  // Pagination dots
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#1E293B',
+  },
+  dotActive: {
+    width: 20,
+    backgroundColor: '#6366F1',
+    borderRadius: 3,
+  },
+
+  // Empty state
+  emptyHistory: {
+    alignItems: 'center',
+    paddingVertical: 36,
+    gap: 10,
+    marginHorizontal: 20,
+    backgroundColor: '#111827',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  emptyText: { color: '#4B5563', fontSize: 14, fontStyle: 'italic' },
+
 });

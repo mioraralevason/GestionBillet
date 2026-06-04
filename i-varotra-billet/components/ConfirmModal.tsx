@@ -5,16 +5,13 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
-  Platform,
   Animated,
   Keyboard,
+  Platform,
 } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-
-const { width } = Dimensions.get('window');
 
 export type ConfirmModalType = 'danger' | 'primary' | 'success' | 'warning' | 'info';
 
@@ -22,6 +19,7 @@ interface ConfirmModalProps {
   visible: boolean;
   title: string;
   message: string;
+  subtitle?: string;
   onConfirm: () => void;
   onCancel?: () => void;
   confirmText?: string;
@@ -36,36 +34,31 @@ const typeConfig = {
     icon: 'alert-circle-outline' as const,
     color: '#EF4444',
     gradient: ['#EF4444', '#DC2626'] as [string, string],
-    bgColor: 'rgba(239, 68, 68, 0.12)',
-    glowColor: 'rgba(239, 68, 68, 0.4)',
+    glowColor: 'rgba(239, 68, 68, 0.25)',
   },
   primary: {
     icon: 'information-outline' as const,
-    color: '#6366F1',
-    gradient: ['#818CF8', '#6366F1'] as [string, string],
-    bgColor: 'rgba(99, 102, 241, 0.12)',
-    glowColor: 'rgba(99, 102, 241, 0.4)',
+    color: '#3B82F6',
+    gradient: ['#60A5FA', '#3B82F6'] as [string, string],
+    glowColor: 'rgba(59, 130, 246, 0.25)',
   },
   success: {
     icon: 'check-circle-outline' as const,
     color: '#10B981',
     gradient: ['#34D399', '#10B981'] as [string, string],
-    bgColor: 'rgba(16, 185, 129, 0.12)',
-    glowColor: 'rgba(16, 185, 129, 0.4)',
+    glowColor: 'rgba(16, 185, 129, 0.25)',
   },
   warning: {
     icon: 'alert-outline' as const,
     color: '#F59E0B',
     gradient: ['#FBBF24', '#F59E0B'] as [string, string],
-    bgColor: 'rgba(245, 158, 11, 0.12)',
-    glowColor: 'rgba(245, 158, 11, 0.4)',
+    glowColor: 'rgba(245, 158, 11, 0.25)',
   },
   info: {
     icon: 'information-outline' as const,
     color: '#3B82F6',
     gradient: ['#60A5FA', '#3B82F6'] as [string, string],
-    bgColor: 'rgba(59, 130, 246, 0.12)',
-    glowColor: 'rgba(59, 130, 246, 0.4)',
+    glowColor: 'rgba(59, 130, 246, 0.25)',
   },
 };
 
@@ -73,6 +66,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   visible,
   title,
   message,
+  subtitle,
   onConfirm,
   onCancel,
   confirmText = 'Confirmer',
@@ -81,75 +75,52 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   showCancel = true,
   dismissKeyboardOnOpen = true,
 }) => {
-  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+  const scaleAnim = useRef(new Animated.Value(0.88)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-  const iconScaleAnim = useRef(new Animated.Value(0.5)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const iconScaleAnim = useRef(new Animated.Value(0.6)).current;
 
   useEffect(() => {
     if (visible) {
-      if (dismissKeyboardOnOpen) {
-        Keyboard.dismiss();
-      }
-      
-      // Main modal animation
+      if (dismissKeyboardOnOpen) Keyboard.dismiss();
+
       Animated.parallel([
         Animated.spring(scaleAnim, {
           toValue: 1,
           useNativeDriver: true,
-          tension: 60,
-          friction: 9,
+          tension: 65,
+          friction: 10,
         }),
         Animated.timing(opacityAnim, {
           toValue: 1,
-          duration: 250,
+          duration: 220,
           useNativeDriver: true,
         }),
         Animated.spring(iconScaleAnim, {
           toValue: 1,
           useNativeDriver: true,
-          tension: 70,
-          friction: 8,
-          delay: 80,
+          tension: 80,
+          friction: 9,
+          delay: 60,
         }),
       ]).start();
-
-      // Subtle pulse animation for the icon
-      Animated.sequence([
-        Animated.delay(300),
-        Animated.parallel([
-          Animated.sequence([
-            Animated.timing(pulseAnim, {
-              toValue: 1.08,
-              duration: 400,
-              useNativeDriver: true,
-            }),
-            Animated.timing(pulseAnim, {
-              toValue: 1,
-              duration: 400,
-              useNativeDriver: true,
-            }),
-          ]),
-        ]),
-      ]).start();
     } else {
-      scaleAnim.setValue(0.85);
+      scaleAnim.setValue(0.88);
       opacityAnim.setValue(0);
-      iconScaleAnim.setValue(0.5);
-      pulseAnim.setValue(1);
+      iconScaleAnim.setValue(0.6);
     }
   }, [visible]);
 
   const handleClose = () => {
     Animated.parallel([
-      Animated.timing(scaleAnim, {
-        toValue: 0.85,
-        duration: 180,
+      Animated.spring(scaleAnim, {
+        toValue: 0.88,
         useNativeDriver: true,
+        tension: 80,
+        friction: 10,
       }),
       Animated.timing(opacityAnim, {
         toValue: 0,
-        duration: 180,
+        duration: 160,
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -168,14 +139,12 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
       statusBarTranslucent
     >
       <View style={styles.overlay}>
-        {/* Backdrop with blur */}
-        {Platform.OS === 'ios' ? (
-          <BlurView intensity={40} style={StyleSheet.absoluteFill} tint="dark" />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.8)' }]} />
-        )}
+        <BlurView
+          intensity={Platform.OS === 'ios' ? 40 : 20}
+          style={StyleSheet.absoluteFill}
+          tint="dark"
+        />
 
-        {/* Modal container */}
         <Animated.View
           style={[
             styles.container,
@@ -185,63 +154,47 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             },
           ]}
         >
-          {/* Gradient glow behind icon */}
+          {/* Subtle glow spot */}
           <View style={[styles.iconGlow, { backgroundColor: config.glowColor }]} />
-          
-          {/* Icon with gradient background */}
-          <Animated.View 
-            style={[
-              styles.iconWrapper,
-              {
-                transform: [{ scale: iconScaleAnim }],
-              }
-            ]}
-          >
+
+          {/* Icon */}
+          <Animated.View style={[styles.iconWrapper, { transform: [{ scale: iconScaleAnim }] }]}>
             <LinearGradient
               colors={config.gradient}
               style={styles.iconGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                <MaterialCommunityIcons
-                  name={config.icon}
-                  size={36}
-                  color="#FFFFFF"
-                />
-              </Animated.View>
+              <MaterialCommunityIcons name={config.icon} size={28} color="#FFFFFF" />
             </LinearGradient>
           </Animated.View>
 
-          {/* Title and Message */}
+          {/* Text */}
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message} numberOfLines={4}>{message}</Text>
+          <Text style={styles.message} numberOfLines={5}>{message}</Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
 
-          {/* Divider line */}
           <View style={styles.divider} />
 
           {/* Buttons */}
-          <View style={styles.buttonContainer}>
+          <View style={styles.buttonRow}>
             {showCancel && (
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={styles.cancelBtn}
                 onPress={handleClose}
                 activeOpacity={0.6}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Ionicons name="close" size={18} color="#94A3B8" style={styles.cancelIcon} />
-                <Text style={styles.cancelButtonText}>{cancelText}</Text>
+                <Ionicons name="close" size={16} color="#64748B" style={{ marginRight: 5 }} />
+                <Text style={styles.cancelText}>{cancelText}</Text>
               </TouchableOpacity>
             )}
 
             <TouchableOpacity
-              style={[
-                styles.confirmButton,
-                !showCancel && styles.confirmButtonFullWidth,
-              ]}
+              style={[styles.confirmBtn, !showCancel && styles.confirmBtnFull]}
               onPress={onConfirm}
               activeOpacity={0.85}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <LinearGradient
                 colors={config.gradient}
@@ -249,8 +202,8 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Text style={styles.confirmButtonText}>{confirmText}</Text>
-                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={styles.confirmIcon} />
+                <Text style={styles.confirmText}>{confirmText}</Text>
+                <Ionicons name="arrow-forward" size={16} color="#FFFFFF" style={{ marginLeft: 5 }} />
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -265,124 +218,123 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   container: {
     width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#1A1F2E',
-    borderRadius: 28,
-    paddingTop: 32,
+    maxWidth: 360,
+    backgroundColor: '#161B27',
+    borderRadius: 24,
+    paddingTop: 28,
     paddingBottom: 20,
-    paddingHorizontal: 24,
+    paddingHorizontal: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255,255,255,0.07)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 24 },
+    shadowOffset: { width: 0, height: 20 },
     shadowOpacity: 0.5,
-    shadowRadius: 40,
-    elevation: 20,
+    shadowRadius: 32,
+    elevation: 18,
   },
   iconGlow: {
     position: 'absolute',
-    top: -10,
+    top: 0,
     left: '50%',
-    marginLeft: -35,
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    opacity: 0.3,
+    marginLeft: -28,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    opacity: 0.4,
   },
   iconWrapper: {
     alignSelf: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
   },
   iconGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowRadius: 12,
+    elevation: 6,
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#F1F5F9',
-    marginBottom: 10,
+    marginBottom: 8,
     textAlign: 'center',
     letterSpacing: 0.2,
   },
   message: {
     fontSize: 14,
     color: '#94A3B8',
-    marginBottom: 8,
     textAlign: 'center',
     lineHeight: 21,
     paddingHorizontal: 4,
   },
+  subtitle: {
+    fontSize: 12,
+    color: '#475569',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginTop: 6,
+    paddingHorizontal: 4,
+  },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    marginHorizontal: 0,
+    backgroundColor: 'rgba(255,255,255,0.07)',
     marginVertical: 16,
   },
-  buttonContainer: {
+  buttonRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
-  cancelButton: {
+  cancelBtn: {
     flex: 1,
     flexDirection: 'row',
-    height: 48,
-    borderRadius: 14,
+    height: 46,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  cancelIcon: {
-    marginRight: 6,
-  },
-  cancelButtonText: {
-    color: '#94A3B8',
-    fontSize: 15,
+  cancelText: {
+    color: '#64748B',
+    fontSize: 14,
     fontWeight: '600',
-    letterSpacing: 0.2,
   },
-  confirmButton: {
+  confirmBtn: {
     flex: 1.5,
-    borderRadius: 14,
+    borderRadius: 13,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  confirmButtonFullWidth: {
+  confirmBtnFull: {
     flex: 1,
   },
   confirmGradient: {
     flexDirection: 'row',
-    height: 48,
+    height: 46,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
   },
-  confirmIcon: {
-    marginLeft: 6,
-  },
-  confirmButtonText: {
+  confirmText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
 });
 

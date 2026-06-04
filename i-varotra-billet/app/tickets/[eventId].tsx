@@ -1,115 +1,117 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, Keyboard, useColorScheme, ScrollView } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  Keyboard,
+  ScrollView,
+  Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
 import { TicketService, Ticket } from '../../services/TicketService';
 import { EventService } from '../../services/EventService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors } from '../../constants/theme';
 import { TicketCard } from '../../components/TicketCard';
+import { SearchBar } from '../../components/ui/SearchBar';
+import { SuggestionList } from '../../components/ui/SuggestionList';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { useRole } from '../../hooks/useRole';
 import { StatusBar } from 'expo-status-bar';
 import ConfirmModal from '../../components/ConfirmModal';
 import { showSuccess, showError } from '../../utils/toast';
+
+// ─── Fuzzy match guard: empty query matches nothing ──────────────────────────
+const fuzzyMatch = (text: string, query: string): boolean => {
+  if (!query) return false;
+  const t = text.toLowerCase();
+  const q = query.toLowerCase();
+  let i = 0, j = 0;
+  while (i < t.length && j < q.length) {
+    if (t[i] === q[j]) j++;
+    i++;
+  }
+  return j === q.length;
+};
 
 export default function TicketList() {
   const { eventId } = useLocalSearchParams();
   const router = useRouter();
   const id = parseInt(eventId as string);
-
-  const colorScheme = useColorScheme() || 'light';
-  const theme = {
-    ...Colors[colorScheme],
-    header: '#000000',
-    background: '#000000',
-    card: '#111827',
-    border: '#1E293B',
-    text: '#FFFFFF',
-    icon: '#94A3B8',
-    tint: '#6366F1'
-  };
+  const { role } = useRole();
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ticketTypes, setTicketTypes] = useState<any[]>([]);
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
-  const [role, setRole] = useState<string | null>(null);
+
+  // Search
   const [search, setSearch] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // Selection mode
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
+  // Modals
   const [showResetModal, setShowResetModal] = useState(false);
   const [showBatchResetModal, setShowBatchResetModal] = useState(false);
   const [pendingResetTicket, setPendingResetTicket] = useState<Ticket | null>(null);
 
   const fetchTickets = useCallback(() => {
-    const list = TicketService.getTicketsByEvent(id);
-    setTickets(list);
-    
-    // Fetch ticket types for filter
-    const types = EventService.getTicketTypes(id);
-    setTicketTypes(types);
+    setTickets(TicketService.getTicketsByEvent(id));
+    setTicketTypes(EventService.getTicketTypes(id));
   }, [id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchTickets();
-      const getRole = async () => {
-        const userRole = await AsyncStorage.getItem('userRole');
-        setRole(userRole);
-      };
-      getRole();
-    }, [fetchTickets])
-  );
+  useFocusEffect(useCallback(() => { fetchTickets(); }, [fetchTickets]));
 
-  const handleResetVerification = (ticket: Ticket) => {
-    setPendingResetTicket(ticket);
-    setShowResetModal(true);
+  // ─── Filtering ─────────────────────────────────────────────────────────────
+  const filteredTickets = useMemo(() => {
+    return tickets.filter(t => {
+      if (selectedTypeId !== null && t.ticket_type_id !== selectedTypeId) return false;
+      if (!search) return true;
+      return (
+        fuzzyMatch(t.ticket_number, search) ||
+        !!(t.buyer_name && t.buyer_name.toLowerCase().includes(search.toLowerCase()))
+      );
+    });
+  }, [tickets, selectedTypeId, search]);
+
+  // ─── Suggestions ───────────────────────────────────────────────────────────
+  const suggestionItems = useMemo(() => {
+    if (!search) return [];
+    const lowerSearch = search.toLowerCase();
+    const seen = new Set<string>();
+    const results: { type: string; value: string }[] = [];
+
+    tickets.forEach(t => {
+      if (fuzzyMatch(t.ticket_number, search)) {
+        const key = 'num:' + t.ticket_number;
+        if (!seen.has(key)) { seen.add(key); results.push({ type: 'number', value: t.ticket_number }); }
+      }
+      if (t.buyer_name && t.buyer_name.toLowerCase().includes(lowerSearch)) {
+        const key = 'name:' + t.buyer_name;
+        if (!seen.has(key)) { seen.add(key); results.push({ type: 'name', value: t.buyer_name }); }
+      }
+    });
+
+    return results.slice(0, 8);
+  }, [tickets, search]);
+
+  const handleSelectSuggestion = (value: string) => {
+    setSearch(value);
+    setShowSuggestions(false);
+    Keyboard.dismiss();
   };
 
-  const confirmResetVerification = () => {
-    setShowResetModal(false);
-    if (!pendingResetTicket) return;
-
-    if (TicketService.resetTicketVerification(pendingResetTicket.id!)) {
-      fetchTickets();
-      showSuccess('Succès', 'La vérification a été réinitialisée.');
-    } else {
-      showError('Erreur', 'Impossible de réinitialiser la vérification.');
-    }
-    setPendingResetTicket(null);
-  };
-
-  const handleBatchResetVerification = () => {
-    setShowMoreMenu(false);
-    if (role !== 'admin' && role !== 'verificateur') return;
-
-    setShowBatchResetModal(true);
-  };
-
-  const confirmBatchResetVerification = () => {
-    setShowBatchResetModal(false);
-
-    if (TicketService.resetTicketsVerificationBatch(selectedIds)) {
-      fetchTickets();
-      cancelSelection();
-      showSuccess('Succès', 'Les vérifications ont été réinitialisées.');
-    } else {
-      showError('Erreur', 'Impossible de réinitialiser les vérifications.');
-    }
-  };
-
+  // ─── Selection ─────────────────────────────────────────────────────────────
   const toggleSelection = (ticketId: number) => {
     setSelectedIds(prev => {
-      if (prev.includes(ticketId)) {
-        const next = prev.filter(i => i !== ticketId);
-        if (next.length === 0) setSelectionMode(false);
-        return next;
-      } else {
-        return [...prev, ticketId];
-      }
+      const next = prev.includes(ticketId) ? prev.filter(i => i !== ticketId) : [...prev, ticketId];
+      if (next.length === 0) setSelectionMode(false);
+      return next;
     });
   };
 
@@ -131,71 +133,63 @@ export default function TicketList() {
   const cancelSelection = () => {
     setSelectionMode(false);
     setSelectedIds([]);
+    setShowMoreMenu(false);
   };
 
   const handleBatchAssign = (mode: 'assign' | 'pay' = 'assign') => {
     router.push({
       pathname: '/assign-ticket/batch',
-      params: { ids: selectedIds.join(','), eventId: id, mode: mode }
+      params: { ids: selectedIds.join(','), eventId: id, mode },
     });
     cancelSelection();
   };
 
-  const fuzzyMatch = (text: string, query: string) => {
-    const t = text.toLowerCase();
-    const q = query.toLowerCase();
-    let i = 0, j = 0;
-    while (i < t.length && j < q.length) {
-      if (t[i] === q[j]) j++;
-      i++;
+  // ─── Reset verification ────────────────────────────────────────────────────
+  const handleResetVerification = (ticket: Ticket) => {
+    setPendingResetTicket(ticket);
+    setShowResetModal(true);
+  };
+
+  const confirmResetVerification = () => {
+    setShowResetModal(false);
+    if (!pendingResetTicket) return;
+    if (TicketService.resetTicketVerification(pendingResetTicket.id!)) {
+      fetchTickets();
+      showSuccess('Succès', 'La vérification a été réinitialisée.');
+    } else {
+      showError('Erreur', 'Impossible de réinitialiser la vérification.');
     }
-    return j === q.length;
+    setPendingResetTicket(null);
   };
 
-  const filteredTickets = tickets.filter(t => {
-    // Filter by type
-    if (selectedTypeId !== null && t.ticket_type_id !== selectedTypeId) {
-      return false;
+  const handleBatchResetVerification = () => {
+    setShowMoreMenu(false);
+    setShowBatchResetModal(true);
+  };
+
+  const confirmBatchResetVerification = () => {
+    setShowBatchResetModal(false);
+    if (TicketService.resetTicketsVerificationBatch(selectedIds)) {
+      fetchTickets();
+      cancelSelection();
+      showSuccess('Succès', 'Les vérifications ont été réinitialisées.');
+    } else {
+      showError('Erreur', 'Impossible de réinitialiser les vérifications.');
     }
-    // Filter by search
-    return fuzzyMatch(t.ticket_number, search) ||
-      (t.buyer_name && t.buyer_name.toLowerCase().includes(search.toLowerCase()));
-  });
-
-  const getSuggestions = () => {
-    if (search.length === 0) return [];
-    const lowerSearch = search.toLowerCase();
-    const results: { type: 'name' | 'number', value: string }[] = [];
-    const seen = new Set<string>();
-
-    tickets.forEach(t => {
-      if (fuzzyMatch(t.ticket_number, search)) {
-        if (!seen.has('num:' + t.ticket_number)) {
-          results.push({ type: 'number', value: t.ticket_number });
-          seen.add('num:' + t.ticket_number);
-        }
-      }
-      if (t.buyer_name && t.buyer_name.toLowerCase().includes(lowerSearch)) {
-        if (!seen.has('name:' + t.buyer_name)) {
-          results.push({ type: 'name', value: t.buyer_name });
-          seen.add('name:' + t.buyer_name);
-        }
-      }
-    });
-
-    return results.slice(0, 8);
   };
 
-  const suggestions = getSuggestions();
-
-  const handleSelectSuggestion = (value: string) => {
-    setSearch(value);
-    setShowSuggestions(false);
-    Keyboard.dismiss();
-  };
+  // ─── Stats for sticky counter header ───────────────────────────────────────
+  const verifiedCount = useMemo(
+    () => filteredTickets.filter(t => t.status_id === TicketService.STATUS_VALIDE).length,
+    [filteredTickets]
+  );
+  const soldCount = useMemo(
+    () => filteredTickets.filter(t => t.status_id === TicketService.STATUS_VENDU).length,
+    [filteredTickets]
+  );
 
   const renderItem = ({ item }: { item: Ticket }) => (
-    <TicketCard 
+    <TicketCard
       item={item}
       isSelected={selectedIds.includes(item.id!)}
       selectionMode={selectionMode}
@@ -207,329 +201,356 @@ export default function TicketList() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
-      <Stack.Screen 
-        options={{ 
+      <Stack.Screen
+        options={{
           headerShown: true,
           headerStyle: { backgroundColor: '#000000' },
           headerTintColor: '#FFFFFF',
           headerTitleStyle: { fontWeight: '900' },
-          headerTitle: 'Liste des Billets'
-        }} 
+          headerTitle: 'Liste des Billets',
+        }}
       />
+
+      {/* ── Selection header (replaces search when active) ── */}
       {selectionMode ? (
-        <View style={[styles.selectionHeader, { backgroundColor: theme.header, borderBottomColor: theme.border }]}>
-          <TouchableOpacity onPress={cancelSelection} style={styles.headerIconBtn}>
-            <MaterialCommunityIcons name="close" size={24} color={theme.danger} />
+        <View style={styles.selectionHeader}>
+          <TouchableOpacity onPress={cancelSelection} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <MaterialCommunityIcons name="close" size={22} color="#EF4444" />
           </TouchableOpacity>
-          
-          <Text style={[styles.selectionCount, { color: theme.text }]}>{selectedIds.length} sélectionnés</Text>
-          
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+
+          <Text style={styles.selectionCount}>{selectedIds.length} sélectionné{selectedIds.length > 1 ? 's' : ''}</Text>
+
+          <View style={styles.selectionActions}>
             {role === 'admin' && (
-              <TouchableOpacity onPress={() => handleBatchAssign('assign')} style={{ marginRight: 15 }}>
-                <Text style={[styles.headerBtnTextAssign, { color: theme.tint }]}>Assigner</Text>
+              <TouchableOpacity onPress={() => handleBatchAssign('assign')} style={styles.selectionActionBtn}>
+                <Text style={styles.selectionActionText}>Assigner</Text>
               </TouchableOpacity>
             )}
-            
             {(role === 'admin' || role === 'verificateur') && (
-              <TouchableOpacity onPress={() => setShowMoreMenu(!showMoreMenu)} style={styles.headerIconBtn}>
-                <MaterialCommunityIcons name="dots-vertical" size={24} color={theme.text} />
+              <TouchableOpacity onPress={() => setShowMoreMenu(v => !v)} style={styles.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <MaterialCommunityIcons name="dots-vertical" size={22} color="#FFFFFF" />
               </TouchableOpacity>
             )}
           </View>
 
           {showMoreMenu && (
-            <View style={[styles.moreMenu, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.moreMenu}>
               <TouchableOpacity style={styles.menuItem} onPress={handleBatchResetVerification}>
-                <MaterialCommunityIcons name="refresh" size={20} color={theme.warning} />
-                <Text style={[styles.menuText, { color: theme.text }]}>Réinitialiser vérification</Text>
+                <MaterialCommunityIcons name="refresh" size={18} color="#F59E0B" />
+                <Text style={styles.menuText}>Réinitialiser vérification</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
       ) : (
-        <View style={[styles.searchContainer, { backgroundColor: theme.card }]}>
-          <MaterialCommunityIcons name="magnify" size={20} color={theme.icon} />
-          <TextInput 
-            style={[styles.searchInput, { color: theme.text }]}
+        /* ── Search bar ── */
+        <View style={styles.searchWrapper}>
+          <SearchBar
             placeholder="Rechercher par n° ou acheteur..."
-            placeholderTextColor={theme.icon}
             value={search}
             onChangeText={(text) => {
               setSearch(text);
               setShowSuggestions(text.length > 0);
             }}
-            onFocus={() => setShowSuggestions(search.length > 0)}
+            onClear={() => setShowSuggestions(false)}
+            onFocus={() => search.length > 0 && setShowSuggestions(true)}
           />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => { setSearch(''); setShowSuggestions(false); }}>
-              <MaterialCommunityIcons name="close-circle" size={18} color={theme.icon} />
-            </TouchableOpacity>
-          )}
+          <SuggestionList
+            visible={showSuggestions && suggestionItems.length > 0}
+            items={suggestionItems}
+            onSelect={handleSelectSuggestion}
+          />
         </View>
       )}
 
-      {!selectionMode && showSuggestions && suggestions.length > 0 && (
-        <View style={[styles.suggestionsList, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {suggestions.map((item, index) => (
-            <TouchableOpacity 
-              key={index} 
-              style={[styles.suggestionItem, { borderBottomColor: theme.border }]} 
-              onPress={() => handleSelectSuggestion(item.value)}
+      {/* ── Ticket type filter chips ── */}
+      {!selectionMode && ticketTypes.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterScroll}
+          contentContainerStyle={styles.filterContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <TouchableOpacity
+            style={[styles.chip, selectedTypeId === null && styles.chipActive]}
+            onPress={() => setSelectedTypeId(null)}
+          >
+            <MaterialCommunityIcons name="ticket-outline" size={14} color={selectedTypeId === null ? '#000' : '#6366F1'} />
+            <Text style={[styles.chipText, selectedTypeId === null && styles.chipTextActive]}>Tous</Text>
+          </TouchableOpacity>
+
+          {ticketTypes.map(type => (
+            <TouchableOpacity
+              key={type.id}
+              style={[styles.chip, selectedTypeId === type.id && styles.chipActive]}
+              onPress={() => setSelectedTypeId(type.id)}
             >
-              <MaterialCommunityIcons 
-                name={item.type === 'name' ? "account" : "ticket-outline"} 
-                size={18} 
-                color={item.type === 'name' ? theme.warning : theme.tint} 
-              />
-              <Text style={[styles.suggestionValue, { color: theme.text }]}>{item.value}</Text>
-              <MaterialCommunityIcons name="arrow-top-left" size={16} color={theme.icon} />
+              <MaterialCommunityIcons name="ticket" size={14} color={selectedTypeId === type.id ? '#000' : '#6366F1'} />
+              <Text style={[styles.chipText, selectedTypeId === type.id && styles.chipTextActive]}>{type.name}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       )}
 
-      {/* Ticket Type Filter */}
-      {!selectionMode && ticketTypes.length > 0 && (
-        <View style={[styles.filterSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.filterHeader}>
-            <MaterialCommunityIcons name="filter-variant" size={18} color={theme.tint} />
-            <Text style={[styles.filterLabel, { color: theme.text }]}>Filtrer par type</Text>
-            {selectedTypeId !== null && (
-              <TouchableOpacity onPress={() => setSelectedTypeId(null)} style={styles.clearFilterBtn}>
-                <Text style={[styles.clearFilterText, { color: theme.danger }]}>Effacer</Text>
-              </TouchableOpacity>
-            )}
+      {/* ── Sticky counter header ── */}
+      {!selectionMode && filteredTickets.length > 0 && (
+        <View style={styles.counterHeader}>
+          <View style={styles.counterItem}>
+            <Text style={styles.counterValue}>{filteredTickets.length}</Text>
+            <Text style={styles.counterLabel}>Total</Text>
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.filterScroll}
-            contentContainerStyle={styles.filterContainer}
-          >
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                selectedTypeId === null && { backgroundColor: theme.tint, borderColor: theme.tint }
-              ]}
-              onPress={() => setSelectedTypeId(null)}
-            >
-              <MaterialCommunityIcons 
-                name="ticket-outline" 
-                size={16} 
-                color={selectedTypeId === null ? '#000' : theme.tint} 
-              />
-              <Text style={[
-                styles.filterChipText,
-                selectedTypeId === null && { color: '#000', fontWeight: 'bold' }
-              ]}>
-                Tous
-              </Text>
-            </TouchableOpacity>
-
-            {ticketTypes.map(type => (
-              <TouchableOpacity
-                key={type.id}
-                style={[
-                  styles.filterChip,
-                  selectedTypeId === type.id && { backgroundColor: theme.tint, borderColor: theme.tint }
-                ]}
-                onPress={() => setSelectedTypeId(type.id)}
-              >
-                <MaterialCommunityIcons 
-                  name="ticket" 
-                  size={16} 
-                  color={selectedTypeId === type.id ? '#000' : theme.tint} 
-                />
-                <Text style={[
-                  styles.filterChipText,
-                  selectedTypeId === type.id && { color: '#000', fontWeight: 'bold' }
-                ]}>
-                  {type.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <View style={styles.counterDivider} />
+          <View style={styles.counterItem}>
+            <Text style={[styles.counterValue, styles.counterSold]}>{soldCount}</Text>
+            <Text style={styles.counterLabel}>Vendus</Text>
+          </View>
+          <View style={styles.counterDivider} />
+          <View style={styles.counterItem}>
+            <Text style={[styles.counterValue, styles.counterVerified]}>{verifiedCount}</Text>
+            <Text style={styles.counterLabel}>Vérifiés</Text>
+          </View>
         </View>
       )}
 
+      {/* ── Ticket list ── */}
       <FlatList
         data={filteredTickets}
         keyExtractor={(item) => item.id!.toString()}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={<Text style={[styles.empty, { color: theme.icon }]}>Aucun billet trouvé</Text>}
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
+          <EmptyState
+            icon={search ? 'ticket-search-outline' : 'ticket-outline'}
+            title={search ? 'Aucun résultat' : 'Aucun billet'}
+            subtitle={
+              search
+                ? `Aucun billet ne correspond à "${search}"`
+                : 'Aucun billet disponible pour cet événement.'
+            }
+          />
+        }
       />
 
+      {/* ── Floating pay button (selection mode) ── */}
       {selectionMode && role === 'admin' && (
         <TouchableOpacity
-          style={[styles.floatingPayBtn, { backgroundColor: theme.success }]}
+          style={styles.floatingPayBtn}
           onPress={() => handleBatchAssign('pay')}
+          activeOpacity={0.85}
         >
-          <MaterialCommunityIcons name="cash-check" size={28} color="#000" />
+          <MaterialCommunityIcons name="cash-check" size={22} color="#000" />
           <Text style={styles.floatingPayText}>PAYER ({selectedIds.length})</Text>
         </TouchableOpacity>
       )}
 
+      {/* ── Modals ── */}
       <ConfirmModal
         visible={showResetModal}
         title="Réinitialiser la vérification"
-        message={pendingResetTicket ? `Voulez-vous vraiment annuler la validation du billet ${pendingResetTicket.ticket_number} ? Il redeviendra "Vendu".` : ''}
+        message={
+          pendingResetTicket
+            ? `Annuler la validation du billet ${pendingResetTicket.ticket_number} ? Il redeviendra "Vendu".`
+            : ''
+        }
         onConfirm={confirmResetVerification}
         onCancel={() => { setShowResetModal(false); setPendingResetTicket(null); }}
         confirmText="Réinitialiser"
         cancelText="Annuler"
-        type="danger"
+        type="warning"
       />
 
       <ConfirmModal
         visible={showBatchResetModal}
         title="Réinitialiser les vérifications"
-        message={`Voulez-vous vraiment annuler la validation des ${selectedIds.length} billets sélectionnés ?`}
+        message={`Annuler la validation des ${selectedIds.length} billet${selectedIds.length > 1 ? 's' : ''} sélectionné${selectedIds.length > 1 ? 's' : ''} ?`}
         onConfirm={confirmBatchResetVerification}
         onCancel={() => setShowBatchResetModal(false)}
         confirmText="Réinitialiser"
         cancelText="Annuler"
-        type="danger"
+        type="warning"
       />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  selectionHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: 10, 
-    borderBottomWidth: 1, 
-    elevation: 3,
+  container: { flex: 1, backgroundColor: '#000000' },
+
+  // ── Selection header ──────────────────────────────────────────────────────
+  selectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B',
+    backgroundColor: '#000000',
     zIndex: 1000,
-    height: 60
+    minHeight: 52,
   },
-  headerIconBtn: { padding: 5 },
-  headerBtnTextAssign: { fontSize: 16, fontWeight: 'bold' },
-  selectionCount: { fontSize: 18, fontWeight: 'bold' },
+  iconBtn: { padding: 4 },
+  selectionCount: {
+    flex: 1,
+    marginLeft: 12,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  selectionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectionActionBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(99,102,241,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(99,102,241,0.3)',
+  },
+  selectionActionText: {
+    color: '#6366F1',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   moreMenu: {
     position: 'absolute',
-    top: 55,
-    right: 10,
-    borderRadius: 8,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    zIndex: 2000,
-    minWidth: 200,
+    top: 52,
+    right: 12,
+    backgroundColor: '#111827',
+    borderRadius: 10,
     borderWidth: 1,
+    borderColor: '#1E293B',
+    zIndex: 2000,
+    minWidth: 220,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+      android: { elevation: 8 },
+    }),
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    gap: 10
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
-  menuText: {
-    fontSize: 16,
+  menuText: { color: '#E2E8F0', fontSize: 15 },
+
+  // ── Search ────────────────────────────────────────────────────────────────
+  searchWrapper: {
+    position: 'relative',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    zIndex: 100,
   },
-  searchContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    margin: 15, 
-    padding: 10, 
-    borderRadius: 12, 
-    elevation: 1,
+
+  // ── Filter chips ──────────────────────────────────────────────────────────
+  filterScroll: {
+    maxHeight: 48,
+    marginTop: 8,
+  },
+  filterContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#111827',
     borderWidth: 1,
-    borderColor: 'transparent'
+    borderColor: '#1E293B',
   },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 16 },
-  suggestionsList: { 
-    position: 'absolute', 
-    top: 120, 
-    left: 15, 
-    right: 15, 
-    borderRadius: 10, 
-    elevation: 8, 
-    zIndex: 2000, 
-    borderWidth: 1, 
-    maxHeight: 250
+  chipActive: {
+    backgroundColor: '#6366F1',
+    borderColor: '#6366F1',
   },
-  suggestionItem: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    padding: 12, 
-    borderBottomWidth: 1, 
+  chipText: {
+    color: '#6366F1',
+    fontSize: 13,
+    fontWeight: '600',
   },
-  suggestionValue: { flex: 1, marginLeft: 10, fontSize: 16 },
-  list: { padding: 15 },
-  empty: { textAlign: 'center', marginTop: 50 },
+  chipTextActive: {
+    color: '#000000',
+    fontWeight: '700',
+  },
+
+  // ── Counter header ────────────────────────────────────────────────────────
+  counterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 4,
+    backgroundColor: '#111827',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    paddingVertical: 10,
+  },
+  counterItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  counterValue: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+  counterSold: { color: '#6366F1' },
+  counterVerified: { color: '#10B981' },
+  counterLabel: {
+    color: '#4B5563',
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  counterDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#1E293B',
+  },
+
+  // ── List ──────────────────────────────────────────────────────────────────
+  list: {
+    padding: 16,
+    paddingBottom: 120,
+  },
+
+  // ── Floating pay button ───────────────────────────────────────────────────
   floatingPayBtn: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 32,
     right: 20,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderRadius: 30,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    gap: 8
+    paddingVertical: 14,
+    borderRadius: 28,
+    backgroundColor: '#10B981',
+    ...Platform.select({
+      ios: { shadowColor: '#10B981', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 12 },
+      android: { elevation: 8 },
+    }),
   },
   floatingPayText: {
-    color: '#000',
-    fontSize: 18,
-    fontWeight: 'bold'
+    color: '#000000',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
-  filterSection: {
-    marginHorizontal: 15,
-    marginBottom: 10,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  filterHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    gap: 8,
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    flex: 1,
-  },
-  clearFilterBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  clearFilterText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  filterScroll: { maxHeight: 45 },
-  filterContainer: { flexDirection: 'row', gap: 8 },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#1E293B',
-    borderWidth: 1,
-    borderColor: '#334155',
-    gap: 6,
-  },
-  filterChipText: {
-    color: '#94A3B8',
-    fontSize: 13,
-    fontWeight: '600'
-  }
 });

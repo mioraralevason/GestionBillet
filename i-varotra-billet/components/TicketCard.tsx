@@ -1,8 +1,13 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
+import React, { memo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Ticket } from '../services/TicketService';
-import { Colors } from '../constants/theme';
+import { Ticket, TicketService } from '../services/TicketService';
+
+const STATUS_COLORS = {
+  verified: '#10B981',
+  sold: '#6366F1',
+  available: '#334155',
+};
 
 interface TicketCardProps {
   item: Ticket;
@@ -14,161 +19,214 @@ interface TicketCardProps {
   onResetVerification?: (item: Ticket) => void;
 }
 
-export const TicketCard: React.FC<TicketCardProps> = ({
+export const TicketCard: React.FC<TicketCardProps> = memo(({
   item,
-  isSelected,
-  selectionMode,
+  isSelected = false,
+  selectionMode = false,
   role,
   onPress,
   onLongPress,
-  onResetVerification
+  onResetVerification,
 }) => {
-  const colorScheme = useColorScheme() || 'light';
-  const theme = {
-    ...Colors[colorScheme],
-    background: '#000000',
-    card: '#111827',
-    border: '#1E293B',
-    text: '#FFFFFF',
-    icon: '#94A3B8',
-    tint: '#6366F1',
-    success: '#10B981',
-    danger: '#FF2E63'
-  };
-  
   const statusText = item.status_name || 'Inconnu';
-  const isVerified = statusText.toLowerCase().includes('vérifié') || statusText.toLowerCase().includes('validé');
-  const isSold = statusText.toLowerCase().includes('vendu');
+  const isVerified = item.status_id === TicketService.STATUS_VALIDE;
+  const isSold = item.status_id === TicketService.STATUS_VENDU;
+  const isAvailable = !isVerified && !isSold;
   const totalPaid = item.total_paid || 0;
+  const remaining = item.price - totalPaid;
+  const canReset = (role === 'admin' || role === 'verificateur') && onResetVerification;
 
-  const getStatusColor = () => {
-    if (isVerified) return theme.success;
-    if (isSold) return theme.tint;
-    return theme.icon;
-  };
+  const accentColor = isVerified
+    ? STATUS_COLORS.verified
+    : isSold
+    ? STATUS_COLORS.sold
+    : STATUS_COLORS.available;
 
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
-        styles.card, 
-        { backgroundColor: theme.card, borderColor: isSelected ? theme.tint : theme.border },
-        isSelected && styles.selectedCard
+        styles.card,
+        isSelected && styles.cardSelected,
+        { borderLeftColor: accentColor },
       ]}
       onPress={() => onPress(item)}
       onLongPress={() => onLongPress(item.id!)}
       activeOpacity={0.7}
     >
-      <View style={styles.leftContent}>
-        <View style={styles.row}>
-          {selectionMode && (
-            <MaterialCommunityIcons
-              name={isSelected ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"}
-              size={22}
-              color={isSelected ? theme.tint : theme.icon}
-              style={{ marginRight: 10 }}
-            />
-          )}
-          <Text style={[styles.ticketNum, { color: theme.text }]}>{item.ticket_number}</Text>
-          {isVerified && (
-            <View style={[styles.verifiedBadge, { backgroundColor: theme.success + '20' }]}>
-              <MaterialCommunityIcons name="check-decagram" size={14} color={theme.success} />
-              <Text style={[styles.verifiedLabel, { color: theme.success }]}>Vérifié</Text>
-              {(role === 'admin' || role === 'verificateur') && onResetVerification && (
-                <TouchableOpacity
-                  style={[styles.resetBtn, { borderColor: theme.tint }]}
-                  onPress={() => onResetVerification(item)}
-                >
-                  <MaterialCommunityIcons name="refresh" size={12} color={theme.tint} />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+      {/* Selection checkbox */}
+      {selectionMode && (
+        <View style={styles.checkboxWrapper}>
+          <MaterialCommunityIcons
+            name={isSelected ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
+            size={20}
+            color={isSelected ? '#6366F1' : '#334155'}
+          />
         </View>
+      )}
+
+      {/* Main content */}
+      <View style={styles.body}>
+        {/* Row 1: ticket number + status badge */}
+        <View style={styles.topRow}>
+          <Text style={styles.ticketNum} numberOfLines={1}>{item.ticket_number}</Text>
+          <View style={[styles.statusPill, { backgroundColor: accentColor + '20', borderColor: accentColor + '60' }]}>
+            {isVerified && <MaterialCommunityIcons name="check-decagram" size={11} color={accentColor} />}
+            <Text style={[styles.statusPillText, { color: accentColor }]}>
+              {isVerified ? 'VÉRIFIÉ' : isSold ? 'VENDU' : 'DISPONIBLE'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Row 2: ticket type tag */}
         {item.ticket_type_name && (
-          <View style={styles.ticketTypeBadge}>
-            <MaterialCommunityIcons name="tag" size={12} color={theme.tint} />
-            <Text style={[styles.ticketTypeText, { color: theme.tint }]}>{item.ticket_type_name}</Text>
+          <View style={styles.typeRow}>
+            <MaterialCommunityIcons name="tag-outline" size={11} color="#6366F1" />
+            <Text style={styles.typeText}>{item.ticket_type_name}</Text>
           </View>
         )}
-        <Text style={[styles.buyerName, { color: theme.icon }]}>
-          {item.buyer_name || 'Disponible'}
+
+        {/* Row 3: buyer */}
+        <Text style={[styles.buyerName, !item.buyer_name && styles.buyerAvailable]}>
+          {item.buyer_name || 'Non assigné'}
         </Text>
-        {item.buyer_phone && (
-          <Text style={[styles.buyerPhone, { color: theme.icon }]}>
-            <MaterialCommunityIcons name="phone" size={12} /> {item.buyer_phone}
-          </Text>
-        )}
+
+        {/* Row 4: phone */}
+        {item.buyer_phone ? (
+          <View style={styles.phoneRow}>
+            <MaterialCommunityIcons name="phone-outline" size={11} color="#4B5563" />
+            <Text style={styles.phoneText}>{item.buyer_phone}</Text>
+          </View>
+        ) : null}
       </View>
-      
-      <View style={styles.rightContent}>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor() }]}>
-          <Text style={styles.statusText}>{isVerified ? 'VÉRIFIÉ' : statusText.toUpperCase()}</Text>
-        </View>
-        <Text style={[styles.price, { color: theme.text }]}>{item.price.toLocaleString()} Ar</Text>
-        {isSold && totalPaid < item.price && (
-          <Text style={[styles.remaining, { color: theme.danger }]}>Reste: {item.price - totalPaid} Ar</Text>
+
+      {/* Right: price & payment */}
+      <View style={styles.right}>
+        <Text style={styles.price}>{item.price.toLocaleString()} Ar</Text>
+        {isSold && remaining > 0 && (
+          <Text style={styles.remaining}>-{remaining.toLocaleString()} Ar</Text>
+        )}
+        {isVerified && canReset && (
+          <TouchableOpacity
+            style={styles.resetBtn}
+            onPress={() => onResetVerification!(item)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <MaterialCommunityIcons name="refresh" size={13} color="#6366F1" />
+          </TouchableOpacity>
         )}
       </View>
     </TouchableOpacity>
   );
-};
+});
 
 const styles = StyleSheet.create({
-  card: { 
-    padding: 16, 
-    borderRadius: 16, 
-    marginBottom: 12, 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    borderRadius: 14,
+    marginBottom: 10,
     borderWidth: 1,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    borderColor: '#1E293B',
+    borderLeftWidth: 4,
+    overflow: 'hidden',
   },
-  selectedCard: { 
-    borderWidth: 2,
+  cardSelected: {
+    borderColor: '#6366F1',
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    backgroundColor: 'rgba(99,102,241,0.06)',
   },
-  leftContent: { flex: 1 },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  ticketNum: { fontSize: 17, fontWeight: '700' },
-  ticketTypeBadge: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 },
-  ticketTypeText: { fontSize: 12, fontWeight: '600' },
-  verifiedBadge: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginLeft: 8, 
-    paddingHorizontal: 8, 
-    paddingVertical: 3, 
-    borderRadius: 6 
+  checkboxWrapper: {
+    paddingLeft: 12,
   },
-  verifiedLabel: { 
-    fontSize: 10, 
-    fontWeight: '800', 
-    marginLeft: 4,
-    textTransform: 'uppercase'
+  body: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingLeft: 12,
+    paddingRight: 4,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  ticketNum: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 8,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  statusPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  typeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 3,
+  },
+  typeText: {
+    color: '#6366F1',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  buyerName: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  buyerAvailable: {
+    color: '#334155',
+    fontStyle: 'italic',
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  phoneText: {
+    color: '#4B5563',
+    fontSize: 11,
+  },
+  right: {
+    alignItems: 'flex-end',
+    paddingRight: 12,
+    paddingVertical: 12,
+    minWidth: 80,
+  },
+  price: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 3,
+  },
+  remaining: {
+    color: '#EF4444',
+    fontSize: 10,
+    fontWeight: '700',
   },
   resetBtn: {
-    marginLeft: 8,
-    backgroundColor: 'transparent',
-    padding: 2,
-    borderRadius: 10,
-    borderWidth: 1,
+    marginTop: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(99,102,241,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  buyerName: { fontSize: 14, fontWeight: '500', marginTop: 4 },
-  buyerPhone: { fontSize: 12, marginTop: 2 },
-  rightContent: { alignItems: 'flex-end' },
-  statusBadge: { 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
-    borderRadius: 8, 
-    marginBottom: 6,
-    minWidth: 70,
-    alignItems: 'center'
-  },
-  statusText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
-  price: { fontSize: 16, fontWeight: '800' },
-  remaining: { fontSize: 11, fontWeight: '600', marginTop: 3 },
 });

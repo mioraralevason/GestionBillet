@@ -1,5 +1,4 @@
-// app/event/[id].tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,122 +8,107 @@ import {
   TextInput,
   ActivityIndicator,
   Modal,
-  useColorScheme
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from 'expo-router';
 import { EventService, Event } from '../../services/EventService';
 import { TicketService } from '../../services/TicketService';
 import { PdfService, PdfExportOptions } from '../../services/PdfService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
-import { Colors } from '../../constants/theme';
 import ConfirmModal from '../../components/ConfirmModal';
-import { showSuccess, showError, showWarning, showInfo } from '../../utils/toast';
+import { showSuccess, showError, showWarning } from '../../utils/toast';
+import { useRole } from '../../hooks/useRole';
 
-/**
- * Screen displaying detailed information about a specific event.
- * Allows admins to generate tickets, view stats, and export PDFs.
- */
+const SURFACE = '#111827';
+const SURFACE2 = '#1E293B';
+const BG = '#000000';
+const TEXT = '#FFFFFF';
+const TEXT2 = '#94A3B8';
+const BORDER = '#1E293B';
+const SUCCESS = '#10B981';
+const DANGER = '#EF4444';
+
 export default function EventDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const eventId = parseInt(id as string);
-  
-  const colorScheme = useColorScheme() || 'light';
-  const theme = Colors[colorScheme];
+  const { role } = useRole();
 
   const [event, setEvent] = useState<Event | null>(null);
-  const [stats, setStats] = useState<any>({ total: 0, available: 0, sold: 0, validated: 0, total_collected: 0, total_pending: 0, total_potential_revenue: 0 });
+  const [stats, setStats] = useState<any>({
+    total: 0, available: 0, sold: 0, validated: 0,
+    total_collected: 0, total_pending: 0, total_potential_revenue: 0,
+  });
   const [ticketTypes, setTicketTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [showExportConfirm, setShowExportConfirm] = useState(false);
+
+  // Preview modal
   const [showPreview, setShowPreview] = useState(false);
   const [previewSide, setPreviewSide] = useState<'recto' | 'verso'>('recto');
-  const [isAdjusting, setIsAdjusting] = useState(false);
-  
-  // Image transformations
+  const [isClearMode, setIsClearMode] = useState(false);
+
+  // Image adjustments
   const [imgScale, setImgScale] = useState(1.0);
   const [imgRotate, setImgRotate] = useState(0);
   const [imgX, setImgX] = useState(0);
   const [imgY, setImgY] = useState(0);
-  const [isClearMode, setIsClearMode] = useState(false);
+  const [isAdjusting, setIsAdjusting] = useState(false);
 
-  // PDF Export options
+  // PDF export options modal
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [exportTicketTypeId, setExportTicketTypeId] = useState<number | null>(null);
   const [exportFromNumber, setExportFromNumber] = useState('');
   const [exportToNumber, setExportToNumber] = useState('');
 
-  // Confirmation modals
+  // Confirmation modal (single, reused)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showExportInfo, setShowExportInfo] = useState(false);
-  const [showExportError, setShowExportError] = useState(false);
-  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
-  const [showSaveError, setShowSaveError] = useState(false);
-  const [showDeleteError, setShowDeleteError] = useState(false);
+  const [showExportConfirm, setShowExportConfirm] = useState(false);
 
-  const themeColor = event?.color || theme.tint;
+  const themeColor = event?.color || '#6366F1';
 
-  /**
-   * Fetches event data and statistics from services.
-   */
-  const fetchData = async () => {
-    const userRole = await AsyncStorage.getItem('userRole');
-    setRole(userRole);
-
+  const fetchData = useCallback(async () => {
     const ev = EventService.getEvents().find(e => e.id === eventId);
     if (ev) {
       setEvent(ev);
-      const s = TicketService.getEventStats(eventId);
-      setStats(s);
+      setStats(TicketService.getEventStats(eventId));
+
       const types = EventService.getTicketTypes(eventId);
       const allTickets = TicketService.getTicketsByEvent(eventId);
-
-      // Calculate stats per ticket type
-      const typesWithStats = types.map(type => {
-        // Filter by ticket_type_id OR by ticket_type_name (fallback for old tickets)
-        const typeTickets = allTickets.filter(t => {
-          return t.ticket_type_id === type.id || t.ticket_type_name === type.name;
-        });
-        const soldTickets = typeTickets.filter(t => t.status_id === TicketService.STATUS_VENDU || t.status_id === TicketService.STATUS_VALIDE);
+      setTicketTypes(types.map(type => {
+        const typeTickets = allTickets.filter(
+          t => t.ticket_type_id === type.id || t.ticket_type_name === type.name
+        );
+        const soldTickets = typeTickets.filter(
+          t => t.status_id === TicketService.STATUS_VENDU || t.status_id === TicketService.STATUS_VALIDE
+        );
         return {
           ...type,
           total: typeTickets.length,
           sold: soldTickets.length,
           validated: typeTickets.filter(t => t.status_id === TicketService.STATUS_VALIDE).length,
-          revenue: soldTickets.reduce((sum, t) => sum + (t.total_paid || 0), 0)
         };
-      });
+      }));
 
-      setTicketTypes(typesWithStats);
-
-      // Load image adjustments
       setImgScale(ev.img_scale || 1.0);
       setImgRotate(ev.img_rotate || 0);
       setImgX(ev.img_x || 0);
       setImgY(ev.img_y || 0);
     }
     setLoading(false);
-  };
+  }, [eventId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchData();
-    }, [])
-  );
+  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
 
-  /**
-   * Triggers PDF generation and sharing.
-   */
-  const handleExportPdf = async () => {
+  // ─── PDF export ──────────────────────────────────────────────────────────────
+
+  const handleExportPdf = () => {
     if (!event) return;
     setShowExportOptions(true);
   };
 
-  const handleConfirmExport = async () => {
+  const handleConfirmExport = () => {
     setShowExportOptions(false);
     setShowExportConfirm(true);
   };
@@ -135,27 +119,21 @@ export default function EventDetails() {
 
     const allTickets = TicketService.getTicketsByEvent(eventId);
     if (allTickets.length === 0) {
-      setShowExportInfo(true);
+      showError('Aucun billet', 'Aucun billet n\'a été généré pour cet événement.');
       setExporting(false);
       return;
     }
 
     const options: PdfExportOptions = {};
-    if (exportTicketTypeId) {
-      options.ticketTypeId = exportTicketTypeId;
-    }
-    if (exportFromNumber) {
-      options.fromNumber = parseInt(exportFromNumber);
-    }
-    if (exportToNumber) {
-      options.toNumber = parseInt(exportToNumber);
-    }
+    if (exportTicketTypeId) options.ticketTypeId = exportTicketTypeId;
+    if (exportFromNumber) options.fromNumber = parseInt(exportFromNumber);
+    if (exportToNumber) options.toNumber = parseInt(exportToNumber);
 
-    const success = await PdfService.exportTicketsToPdf(event, allTickets, options);
-    if (!success) {
-      setShowExportError(true);
-    } else {
+    const success = await PdfService.exportTicketsToPdf(event!, allTickets, options);
+    if (success) {
       showSuccess('PDF exporté avec succès');
+    } else {
+      showError('Erreur', 'Impossible de générer le PDF.');
     }
     setExporting(false);
     setExportTicketTypeId(null);
@@ -163,37 +141,27 @@ export default function EventDetails() {
     setExportToNumber('');
   };
 
-  /**
-   * Saves image adjustments (scale, rotate, position) to the database.
-   */
+  // ─── Image adjustments ───────────────────────────────────────────────────────
+
   const handleSaveAdjustments = () => {
     if (!event) return;
-    const updatedEvent = {
-      ...event,
-      img_scale: imgScale,
-      img_rotate: imgRotate,
-      img_x: imgX,
-      img_y: imgY
-    };
-    if (EventService.updateEvent(updatedEvent)) {
-      setEvent(updatedEvent);
+    const updated = { ...event, img_scale: imgScale, img_rotate: imgRotate, img_x: imgX, img_y: imgY };
+    if (EventService.updateEvent(updated)) {
+      setEvent(updated);
       setIsAdjusting(false);
-      setShowSaveSuccess(true);
+      showSuccess('Ajustements enregistrés.');
     } else {
-      setShowSaveError(true);
+      showError('Erreur', 'Impossible d\'enregistrer.');
     }
   };
 
-  /**
-   * Handles event deletion with confirmation.
-   * Only accessible by admin users.
-   */
+  // ─── Delete ───────────────────────────────────────────────────────────────────
+
   const handleDelete = () => {
     if (role !== 'admin') {
       showWarning('Seul un administrateur peut supprimer cet événement.');
       return;
     }
-
     setShowDeleteConfirm(true);
   };
 
@@ -202,88 +170,153 @@ export default function EventDetails() {
     if (EventService.deleteEvent(eventId)) {
       router.back();
     } else {
-      setShowDeleteError(true);
+      showError('Erreur', 'Impossible de supprimer l\'événement.');
     }
   };
 
-  if (loading) return <View style={[styles.center, { backgroundColor: theme.background }]}><ActivityIndicator size="large" color={theme.tint} /></View>;
-  if (!event) return <View style={[styles.center, { backgroundColor: theme.background }]}><Text style={{ color: theme.text }}>Événement non trouvé</Text></View>;
+  // ─── Derived ─────────────────────────────────────────────────────────────────
+
+  const fillPercent = useMemo(() => {
+    if (!stats.total) return 0;
+    return Math.round(((stats.sold + stats.validated) / stats.total) * 100);
+  }, [stats]);
+
+  // ─── Loading / not found ─────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#6366F1" />
+      </View>
+    );
+  }
+
+  if (!event) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ color: TEXT2 }}>Événement non trouvé</Text>
+      </View>
+    );
+  }
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-      <Stack.Screen 
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <Stack.Screen
         options={{
-          headerStyle: { backgroundColor: theme.header },
-          headerTintColor: theme.text,
-          headerRight: () => role === 'admin' ? (
-            <TouchableOpacity onPress={() => router.push({ pathname: '/add-event', params: { id: eventId } })}>
-              <MaterialCommunityIcons name="pencil" size={24} color={themeColor} />
-            </TouchableOpacity>
-          ) : null
+          headerStyle: { backgroundColor: BG },
+          headerTintColor: TEXT,
+          headerTitle: event.name ?? 'Événement',
+          headerTitleStyle: { fontSize: 16, fontWeight: '700' },
+          headerRight: () =>
+            role === 'admin' ? (
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/add-event', params: { id: eventId } })}
+                style={{ marginRight: 16 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <MaterialCommunityIcons name="pencil-outline" size={22} color={themeColor} />
+              </TouchableOpacity>
+            ) : null,
         }}
       />
-      <View style={[styles.header, { backgroundColor: theme.header, borderBottomColor: theme.border, borderLeftWidth: 8, borderLeftColor: themeColor }]}>
-        <Text style={[styles.title, { color: theme.text }]}>{event.name}</Text>
-        <Text style={[styles.date, { color: theme.icon }]}>{event.event_date}</Text>
-        {event.slogan && <Text style={[styles.slogan, { color: themeColor }]}>{event.slogan}</Text>}
+
+      {/* ── Hero header ─────────────────────────────────────────────────── */}
+      <View style={[styles.hero, { borderLeftColor: themeColor }]}>
+        <View style={styles.heroTop}>
+          <View style={[styles.colorDot, { backgroundColor: themeColor }]} />
+          <Text style={styles.heroDate}>{event.event_date}</Text>
+        </View>
+        <Text style={styles.heroName}>{event.name}</Text>
+        {event.slogan ? (
+          <Text style={[styles.heroSlogan, { color: themeColor }]}>{event.slogan}</Text>
+        ) : null}
       </View>
 
-      <View style={[styles.statsContainer, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-        <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: theme.text }]}>{stats.total}</Text>
-          <Text style={[styles.statLabel, { color: theme.icon }]}>Total</Text>
+      {/* ── Stats bar ───────────────────────────────────────────────────── */}
+      <View style={styles.statsBar}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{stats.total}</Text>
+          <Text style={styles.statLabel}>Total</Text>
         </View>
-        <View style={[styles.statBox, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: theme.border }]}>
-          <Text style={[styles.statValue, { color: theme.text }]}>{stats.sold}</Text>
-          <Text style={[styles.statLabel, { color: theme.icon }]}>Vendus</Text>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statValue, { color: themeColor }]}>{stats.sold}</Text>
+          <Text style={styles.statLabel}>Vendus</Text>
         </View>
-        <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: theme.success }]}>{stats.validated}</Text>
-          <Text style={[styles.statLabel, { color: theme.icon }]}>Vérifiés</Text>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statValue, { color: SUCCESS }]}>{stats.validated}</Text>
+          <Text style={styles.statLabel}>Vérifiés</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{fillPercent}%</Text>
+          <Text style={styles.statLabel}>Remplissage</Text>
         </View>
       </View>
 
+      {/* Fill progress */}
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${fillPercent}%` as any, backgroundColor: themeColor }]} />
+      </View>
+
+      {/* ── Finance card (admin only) ────────────────────────────────────── */}
       {role === 'admin' && (
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>Bilan Financier</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Bilan Financier</Text>
           <View style={styles.financeRow}>
             <View style={styles.financeItem}>
-              <Text style={[styles.financeLabel, { color: theme.icon }]}>Encaissé</Text>
-              <Text style={[styles.financeValue, { color: theme.success }]}>{(stats.total_collected ?? 0).toLocaleString()} Ar</Text>
+              <Text style={styles.financeLabel}>Encaissé</Text>
+              <Text style={[styles.financeValue, { color: SUCCESS }]}>
+                {(stats.total_collected ?? 0).toLocaleString()} Ar
+              </Text>
             </View>
             <View style={styles.financeItem}>
-              <Text style={[styles.financeLabel, { color: theme.icon }]}>Reste</Text>
-              <Text style={[styles.financeValue, { color: theme.danger }]}>{(stats.total_pending ?? 0).toLocaleString()} Ar</Text>
+              <Text style={styles.financeLabel}>Reste dû</Text>
+              <Text style={[styles.financeValue, { color: DANGER }]}>
+                {(stats.total_pending ?? 0).toLocaleString()} Ar
+              </Text>
             </View>
           </View>
-          <View style={[styles.financeItem, { marginTop: 15, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 10 }]}>
-            <Text style={[styles.financeLabel, { color: theme.icon }]}>Chiffre d'affaires total prévu</Text>
-            <Text style={[styles.financeValue, { fontSize: 20, color: themeColor }]}>{(stats.total_potential_revenue ?? 0).toLocaleString()} Ar</Text>
+          <View style={styles.financeTotalRow}>
+            <Text style={styles.financeLabel}>CA total prévu</Text>
+            <Text style={[styles.financeValue, { color: themeColor, fontSize: 20 }]}>
+              {(stats.total_potential_revenue ?? 0).toLocaleString()} Ar
+            </Text>
           </View>
         </View>
       )}
 
+      {/* ── Ticket types ────────────────────────────────────────────────── */}
       {ticketTypes.length > 0 && (
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>Types de Billets</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Types de Billets</Text>
           {ticketTypes.map((type, index) => (
-            <View key={type.id} style={[styles.ticketTypeRow, index < ticketTypes.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: 10, marginBottom: 10 }]}>
-              <View style={styles.ticketTypeInfo}>
-                <Text style={[styles.ticketTypeName, { color: themeColor }]}>{type.name}</Text>
-                <Text style={[styles.ticketTypePrice, { color: theme.icon }]}>{(type.price ?? 0).toLocaleString()} Ar</Text>
+            <View
+              key={type.id}
+              style={[
+                styles.typeRow,
+                index < ticketTypes.length - 1 && styles.typeRowBorder,
+              ]}
+            >
+              <View style={styles.typeInfo}>
+                <Text style={[styles.typeName, { color: themeColor }]}>{type.name}</Text>
+                <Text style={styles.typePrice}>{(type.price ?? 0).toLocaleString()} Ar</Text>
               </View>
-              <View style={styles.ticketTypeStats}>
-                <View style={styles.ticketTypeStatItem}>
-                  <Text style={[styles.ticketTypeStatValue, { color: theme.text }]}>{type.total}</Text>
-                  <Text style={[styles.ticketTypeStatLabel, { color: theme.icon }]}>Total</Text>
+              <View style={styles.typeStats}>
+                <View style={styles.typeStatItem}>
+                  <Text style={styles.typeStatValue}>{type.total}</Text>
+                  <Text style={styles.typeStatLabel}>Total</Text>
                 </View>
-                <View style={[styles.ticketTypeStatItem, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: theme.border }]}>
-                  <Text style={[styles.ticketTypeStatValue, { color: theme.text }]}>{type.sold}</Text>
-                  <Text style={[styles.ticketTypeStatLabel, { color: theme.icon }]}>Vendus</Text>
+                <View style={[styles.typeStatItem, styles.typeStatBorder]}>
+                  <Text style={[styles.typeStatValue, { color: themeColor }]}>{type.sold}</Text>
+                  <Text style={styles.typeStatLabel}>Vendus</Text>
                 </View>
-                <View style={styles.ticketTypeStatItem}>
-                  <Text style={[styles.ticketTypeStatValue, { color: theme.success }]}>{type.validated}</Text>
-                  <Text style={[styles.ticketTypeStatLabel, { color: theme.icon }]}>Vérifiés</Text>
+                <View style={styles.typeStatItem}>
+                  <Text style={[styles.typeStatValue, { color: SUCCESS }]}>{type.validated}</Text>
+                  <Text style={styles.typeStatLabel}>Vérifiés</Text>
                 </View>
               </View>
             </View>
@@ -291,139 +324,137 @@ export default function EventDetails() {
         </View>
       )}
 
-      {/* Actions Grid - 2x2 Cards */}
-      <View style={styles.actionsGridContainer}>
+      {/* ── Action grid ─────────────────────────────────────────────────── */}
+      <View style={styles.actionsGrid}>
         {role === 'admin' && (
-          <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: themeColor }]}
+          <ActionCard
+            icon="ticket-outline"
+            label="Générer billets"
+            color={themeColor}
+            textColor="#000"
             onPress={() => router.push(`/event/${id}/generate`)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.actionIconWrapper}>
-              <MaterialCommunityIcons name="ticket-outline" size={32} color="#000" />
-            </View>
-            <Text style={[styles.actionText, { color: '#000' }]}>Générer billet</Text>
-          </TouchableOpacity>
+          />
         )}
 
-        <TouchableOpacity
-          style={[styles.actionCard, { backgroundColor: theme.success }]}
+        <ActionCard
+          icon={exporting ? undefined : 'file-pdf-box'}
+          label="Exporter PDF"
+          color={SUCCESS}
+          textColor="#000"
           onPress={handleExportPdf}
           disabled={exporting}
-          activeOpacity={0.8}
-        >
-          <View style={styles.actionIconWrapper}>
-            {exporting ? (
-              <ActivityIndicator color="#000" />
-            ) : (
-              <MaterialCommunityIcons name="file-pdf-box" size={32} color="#000" />
-            )}
-          </View>
-          <Text style={[styles.actionText, { color: '#000' }]}>Exporter PDF</Text>
-        </TouchableOpacity>
+          loading={exporting}
+        />
 
-        <TouchableOpacity
-          style={[styles.actionCard, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}
+        <ActionCard
+          icon="eye-outline"
+          label="Aperçu billet"
+          color={SURFACE}
+          textColor={TEXT}
+          borderColor={BORDER}
+          iconColor={themeColor}
           onPress={() => setShowPreview(true)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.actionIconWrapper, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
-            <MaterialCommunityIcons name="eye" size={32} color={theme.tint} />
-          </View>
-          <Text style={[styles.actionText, { color: theme.tint }]}>Visualiser modèle</Text>
-        </TouchableOpacity>
+        />
 
-        <TouchableOpacity
-          style={[styles.actionCard, { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1 }]}
+        <ActionCard
+          icon="ticket-confirmation-outline"
+          label="Voir billets"
+          color={SURFACE}
+          textColor={TEXT}
+          borderColor={BORDER}
+          iconColor={themeColor}
           onPress={() => router.push(`/tickets/${eventId}`)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.actionIconWrapper, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
-            <MaterialCommunityIcons name="ticket-confirmation" size={32} color={themeColor} />
-          </View>
-          <Text style={[styles.actionText, { color: theme.text }]}>Voir liste</Text>
-        </TouchableOpacity>
+        />
       </View>
 
-      {/* Preview Modal */}
-      <Modal visible={showPreview} transparent animationType="slide">
+      {/* ── Delete (admin only) ─────────────────────────────────────────── */}
+      {role === 'admin' && (
+        <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="trash-can-outline" size={18} color={DANGER} />
+          <Text style={styles.deleteBtnText}>Supprimer l'événement</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* ── Ticket preview modal ─────────────────────────────────────────── */}
+      <Modal visible={showPreview} transparent animationType="slide" onRequestClose={() => setShowPreview(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.previewContent, { backgroundColor: theme.card }]}>
+          <View style={styles.previewSheet}>
+            {/* Header */}
             <View style={styles.previewHeader}>
-              <Text style={[styles.previewTitle, { color: theme.text }]}>Aperçu du Billet</Text>
-              <View style={{ flexDirection: 'row', gap: 15 }}>
-                {previewSide === 'verso' && event?.image && (
-                  <TouchableOpacity onPress={() => setIsClearMode(!isClearMode)}>
-                    <MaterialCommunityIcons name={isClearMode ? "eye-off" : "image"} size={24} color={isClearMode ? themeColor : theme.icon} />
+              <Text style={styles.previewTitle}>Aperçu du Billet</Text>
+              <View style={styles.previewHeaderRight}>
+                {previewSide === 'verso' && event.image && (
+                  <TouchableOpacity
+                    onPress={() => setIsClearMode(v => !v)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <MaterialCommunityIcons
+                      name={isClearMode ? 'eye-off-outline' : 'image-outline'}
+                      size={22}
+                      color={isClearMode ? themeColor : TEXT2}
+                    />
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity onPress={() => setShowPreview(false)}>
-                  <MaterialCommunityIcons name="close" size={28} color={theme.text} />
+                <TouchableOpacity onPress={() => setShowPreview(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <MaterialCommunityIcons name="close" size={24} color={TEXT} />
                 </TouchableOpacity>
               </View>
             </View>
 
-            <View style={[styles.toggleContainer, { backgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#F0F0F0' }]}>
-              <TouchableOpacity 
+            {/* Recto / Verso toggle */}
+            <View style={styles.toggle}>
+              <TouchableOpacity
                 style={[styles.toggleBtn, previewSide === 'recto' && { backgroundColor: themeColor }]}
                 onPress={() => setPreviewSide('recto')}
               >
-                <Text style={[styles.toggleText, { color: previewSide === 'recto' ? '#000' : theme.icon }]}>RECTO</Text>
+                <Text style={[styles.toggleText, { color: previewSide === 'recto' ? '#000' : TEXT2 }]}>RECTO</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.toggleBtn, previewSide === 'verso' && { backgroundColor: themeColor }]}
                 onPress={() => setPreviewSide('verso')}
               >
-                <Text style={[styles.toggleText, { color: previewSide === 'verso' ? '#000' : theme.icon }]}>VERSO</Text>
+                <Text style={[styles.toggleText, { color: previewSide === 'verso' ? '#000' : TEXT2 }]}>VERSO</Text>
               </TouchableOpacity>
             </View>
 
+            {/* Ticket preview */}
             <View style={styles.ticketContainer}>
-              {/* Face RECTO */}
+              {/* RECTO */}
               <View
                 style={[
                   styles.ticketPreview,
-                  styles.ticketRecto,
-                  { backgroundColor: '#FFF' },
-                  previewSide !== 'recto' && { position: 'absolute', opacity: 0, zIndex: -1 }
+                  previewSide !== 'recto' && styles.ticketHidden,
                 ]}
                 pointerEvents={previewSide === 'recto' ? 'auto' : 'none'}
               >
-                {/* Section colorée avec courbe */}
-                <View style={[styles.rectoTopSection, { backgroundColor: themeColor }]}>
-                  {event?.slogan && (
+                <View style={[styles.rectoTop, { backgroundColor: themeColor }]}>
+                  {event.slogan ? (
                     <Text style={styles.rectoSlogan} numberOfLines={1}>{event.slogan}</Text>
-                  )}
-                  <View style={styles.rectoTopContent}>
-                    <Text style={styles.rectoTitle}>BILLET</Text>
-                    <MaterialCommunityIcons name="ticket-outline" size={45} color="#000" />
-                  </View>
+                  ) : null}
+                  <Text style={styles.rectoLabel}>BILLET</Text>
+                  <MaterialCommunityIcons name="ticket-outline" size={40} color="#000" />
                 </View>
-                {/* Section blanche avec courbe vers le haut */}
-                <View style={[styles.rectoBottomSection, { backgroundColor: '#FFF' }]}>
-                  <View style={styles.rectoEventInfo}>
-                    <Text style={[styles.previewEventName, { color: themeColor }]} numberOfLines={2}>{event?.name}</Text>
-                    <Text style={[styles.previewEventDate, { color: '#666' }]}>{event?.event_date}</Text>
+                <View style={styles.rectoBottom}>
+                  <Text style={[styles.rectoEventName, { color: themeColor }]} numberOfLines={2}>
+                    {event.name}
+                  </Text>
+                  <Text style={styles.rectoEventDate}>{event.event_date}</Text>
+                  <View style={styles.rectoNumBox}>
+                    <Text style={styles.rectoNumText}>E{event.id}-T0001</Text>
                   </View>
-                  <View style={styles.previewNumBox}>
-                    <Text style={styles.previewNumText}>E{event?.id}-T0001</Text>
-                  </View>
-                  <MaterialCommunityIcons name="qrcode" size={110} color="#333" />
+                  <MaterialCommunityIcons name="qrcode" size={100} color="#333" />
                 </View>
               </View>
 
-              {/* Face VERSO */}
+              {/* VERSO */}
               <View
                 style={[
                   styles.ticketPreview,
-                  styles.ticketVerso,
-                  { backgroundColor: '#FFF' },
-                  previewSide !== 'verso' && { position: 'absolute', opacity: 0, zIndex: -1 }
+                  previewSide !== 'verso' && styles.ticketHidden,
                 ]}
                 pointerEvents={previewSide === 'verso' ? 'auto' : 'none'}
               >
-                {/* Image de fond avec transformations */}
-                {event?.image && (
+                {event.image ? (
                   <Image
                     source={{ uri: event.image }}
                     style={[
@@ -433,214 +464,177 @@ export default function EventDetails() {
                           { scale: imgScale },
                           { rotate: `${imgRotate}deg` },
                           { translateX: imgX },
-                          { translateY: imgY }
-                        ]
-                      }
+                          { translateY: imgY },
+                        ],
+                      },
                     ]}
                     contentFit="cover"
                   />
-                )}
-
-                {/* Calque de contraste atténué si mode clair */}
-                {event?.image && (
-                  <View style={[StyleSheet.absoluteFill, { backgroundColor: isClearMode ? 'transparent' : 'rgba(255,255,255,0.7)' }]} />
-                )}
-
-                {/* Logo au milieu */}
-                <View style={styles.versoLogoContainer}>
+                ) : null}
+                {event.image ? (
+                  <View
+                    style={[
+                      StyleSheet.absoluteFill,
+                      { backgroundColor: isClearMode ? 'transparent' : 'rgba(255,255,255,0.7)' },
+                    ]}
+                  />
+                ) : null}
+                <View style={styles.versoCenter}>
                   <Image
                     source={require('../../assets/logo_iBillet.png')}
                     style={styles.versoLogo}
                     contentFit="contain"
                   />
                 </View>
-
-                {/* Description si présente */}
-                {event?.description && (
-                  <View style={styles.versoDescriptionContainer}>
-                    <Text style={styles.versoDescription}>
-                      {event.description}
-                    </Text>
+                {event.description ? (
+                  <View style={styles.versoDescBox}>
+                    <Text style={styles.versoDesc} numberOfLines={3}>{event.description}</Text>
                   </View>
-                )}
-
-                {/* Footer removed for preview */}
-                <View style={styles.versoFooter} />
+                ) : null}
               </View>
             </View>
 
-            {/* Adjustment Controls - Displayed below ticket */}
-            {previewSide === 'verso' && event?.image && role === 'admin' && (
-              <View style={styles.adjustmentControls}>
+            {/* Image adjustment panel (admin + verso + image) */}
+            {previewSide === 'verso' && event.image && role === 'admin' && (
+              <View style={styles.adjSection}>
                 {!isAdjusting ? (
-                  <TouchableOpacity style={[styles.controlBtn, { backgroundColor: theme.tint }]} onPress={() => setIsAdjusting(true)}>
-                    <MaterialCommunityIcons name="cog" size={20} color="#000" />
-                    <Text style={[styles.controlBtnText, { color: '#000' }]}>Ajuster la photo</Text>
+                  <TouchableOpacity
+                    style={[styles.adjToggleBtn, { borderColor: themeColor }]}
+                    onPress={() => setIsAdjusting(true)}
+                  >
+                    <MaterialCommunityIcons name="cog-outline" size={18} color={themeColor} />
+                    <Text style={[styles.adjToggleBtnText, { color: themeColor }]}>Ajuster la photo</Text>
                   </TouchableOpacity>
                 ) : (
-                  <View style={[styles.adjustmentPanelCompact, { backgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#F9F9F9', borderColor: theme.border }]}>
-                      <View style={styles.adjCompactRow}>
-                        <View style={styles.adjCompactItem}>
-                          <Text style={[styles.adjCompactLabel, { color: theme.text }]}>Zoom</Text>
-                          <View style={styles.adjCompactControls}>
-                            <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgScale(s => Math.max(0.5, s - 0.1))}>
-                              <MaterialCommunityIcons name="minus" size={16} color={theme.icon} />
-                            </TouchableOpacity>
-                            <Text style={[styles.adjCompactValue, { color: themeColor }]}>{imgScale.toFixed(1)}</Text>
-                            <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgScale(s => Math.min(3, s + 0.1))}>
-                              <MaterialCommunityIcons name="plus" size={16} color={theme.icon} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                        <View style={styles.adjCompactItem}>
-                          <Text style={[styles.adjCompactLabel, { color: theme.text }]}>Rot</Text>
-                          <View style={styles.adjCompactControls}>
-                            <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgRotate(r => r - 10)}>
-                              <MaterialCommunityIcons name="rotate-left" size={16} color={theme.icon} />
-                            </TouchableOpacity>
-                            <Text style={[styles.adjCompactValue, { color: themeColor }]}>{imgRotate}°</Text>
-                            <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgRotate(r => r + 10)}>
-                              <MaterialCommunityIcons name="rotate-right" size={16} color={theme.icon} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                        <View style={styles.adjCompactItem}>
-                          <Text style={[styles.adjCompactLabel, { color: theme.text }]}>Pos</Text>
-                          <View style={styles.adjCompactControls}>
-                            <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => { setImgX(0); setImgY(0); }}>
-                              <MaterialCommunityIcons name="close" size={16} color={theme.danger} />
-                            </TouchableOpacity>
-                            <Text style={[styles.adjCompactValue, { color: themeColor }]}>{imgX},{imgY}</Text>
-                            <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgY(y => y + 5)}>
-                              <MaterialCommunityIcons name="chevron-down" size={16} color={theme.icon} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </View>
-                      <View style={styles.adjCompactMoveRow}>
-                        <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgY(y => y - 5)}>
-                          <MaterialCommunityIcons name="chevron-up" size={20} color={theme.icon} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgX(x => x - 5)}>
-                          <MaterialCommunityIcons name="chevron-left" size={20} color={theme.icon} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.adjCompactBtn, { backgroundColor: theme.card }]} onPress={() => setImgX(x => x + 5)}>
-                          <MaterialCommunityIcons name="chevron-right" size={20} color={theme.icon} />
+                  <View style={styles.adjPanel}>
+                    <View style={styles.adjRow}>
+                      <AdjControl
+                        label="Zoom"
+                        value={`${imgScale.toFixed(1)}x`}
+                        onMinus={() => setImgScale(s => Math.max(0.5, parseFloat((s - 0.1).toFixed(1))))}
+                        onPlus={() => setImgScale(s => Math.min(3, parseFloat((s + 0.1).toFixed(1))))}
+                        color={themeColor}
+                      />
+                      <AdjControl
+                        label="Rotation"
+                        value={`${imgRotate}°`}
+                        onMinus={() => setImgRotate(r => r - 10)}
+                        onPlus={() => setImgRotate(r => r + 10)}
+                        color={themeColor}
+                      />
+                    </View>
+                    <View style={styles.adjMoveGrid}>
+                      <View style={styles.adjMoveRow}>
+                        <TouchableOpacity style={styles.adjMoveBtn} onPress={() => setImgY(y => y - 5)}>
+                          <MaterialCommunityIcons name="chevron-up" size={20} color={TEXT2} />
                         </TouchableOpacity>
                       </View>
-                      <View style={styles.controlButtonsRow}>
-                        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#64748B' }]} onPress={() => { setIsAdjusting(false); fetchData(); }}>
-                          <Text style={[styles.actionBtnText, { color: '#FFF' }]}>Annuler</Text>
+                      <View style={styles.adjMoveRow}>
+                        <TouchableOpacity style={styles.adjMoveBtn} onPress={() => setImgX(x => x - 5)}>
+                          <MaterialCommunityIcons name="chevron-left" size={20} color={TEXT2} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: themeColor }]} onPress={handleSaveAdjustments}>
-                          <Text style={[styles.actionBtnText, { color: '#000' }]}>Sauvegarder</Text>
+                        <TouchableOpacity
+                          style={[styles.adjMoveBtn, { backgroundColor: 'rgba(239,68,68,0.1)' }]}
+                          onPress={() => { setImgX(0); setImgY(0); }}
+                        >
+                          <MaterialCommunityIcons name="close" size={16} color={DANGER} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.adjMoveBtn} onPress={() => setImgX(x => x + 5)}>
+                          <MaterialCommunityIcons name="chevron-right" size={20} color={TEXT2} />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.adjMoveRow}>
+                        <TouchableOpacity style={styles.adjMoveBtn} onPress={() => setImgY(y => y + 5)}>
+                          <MaterialCommunityIcons name="chevron-down" size={20} color={TEXT2} />
                         </TouchableOpacity>
                       </View>
                     </View>
+                    <View style={styles.adjActions}>
+                      <TouchableOpacity
+                        style={styles.adjCancelBtn}
+                        onPress={() => { setIsAdjusting(false); fetchData(); }}
+                      >
+                        <Text style={styles.adjCancelText}>Annuler</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.adjSaveBtn, { backgroundColor: themeColor }]}
+                        onPress={handleSaveAdjustments}
+                      >
+                        <Text style={styles.adjSaveText}>Sauvegarder</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 )}
               </View>
             )}
 
-            {!isAdjusting && <Text style={[styles.previewHint, { color: theme.icon }]}>Note: Cet aperçu respecte le design du PDF final.</Text>}
+            {!isAdjusting && (
+              <Text style={styles.previewHint}>Aperçu fidèle au design PDF final.</Text>
+            )}
           </View>
         </View>
       </Modal>
 
-      {role === 'admin' && (
-        <TouchableOpacity
-          style={[styles.card, styles.deleteButton, { borderColor: theme.danger, backgroundColor: 'transparent' }]}
-          onPress={handleDelete}
-        >
-          <MaterialCommunityIcons name="trash-can-outline" size={20} color={theme.danger} />
-          <Text style={[styles.deleteButtonText, { color: theme.danger }]}>Supprimer l'événement</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Confirmation Modals */}
-      <ConfirmModal
-        visible={showDeleteConfirm}
-        title="Supprimer l'événement"
-        message="Êtes-vous sûr de vouloir supprimer cet événement et tous les billets associés ? Cette action est irréversible."
-        onConfirm={executeDelete}
-        onCancel={() => setShowDeleteConfirm(false)}
-        confirmText="Supprimer"
-        type="danger"
-      />
-
-      <ConfirmModal
-        visible={showExportInfo}
-        title="Aucun billet"
-        message="Aucun billet n'a été généré pour cet événement."
-        onConfirm={() => setShowExportInfo(false)}
-        onCancel={() => setShowExportInfo(false)}
-        confirmText="OK"
-        type="info"
-        showCancel={false}
-      />
-
-      {/* PDF Export Options Modal */}
+      {/* ── PDF export options modal ─────────────────────────────────────── */}
       <Modal
         visible={showExportOptions}
         animationType="slide"
-        transparent={true}
+        transparent
         onRequestClose={() => setShowExportOptions(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Options d'export PDF</Text>
-            
-            <Text style={[styles.label, { color: theme.text }]}>Type de billet (optionnel)</Text>
+          <View style={styles.exportSheet}>
+            <Text style={styles.exportTitle}>Options d'export PDF</Text>
+
+            <Text style={styles.exportLabel}>Type de billet</Text>
             <View style={styles.typeSelector}>
               <TouchableOpacity
-                style={[
-                  styles.typeButton,
-                  !exportTicketTypeId && { backgroundColor: themeColor, borderColor: themeColor }
-                ]}
+                style={[styles.typeChip, !exportTicketTypeId && { backgroundColor: themeColor, borderColor: themeColor }]}
                 onPress={() => setExportTicketTypeId(null)}
               >
-                <Text style={[styles.typeButtonText, !exportTicketTypeId && { color: '#FFF' }]}>Tous</Text>
+                <Text style={[styles.typeChipText, !exportTicketTypeId && { color: '#FFF', fontWeight: '700' }]}>Tous</Text>
               </TouchableOpacity>
               {ticketTypes.map(type => (
                 <TouchableOpacity
                   key={type.id}
                   style={[
-                    styles.typeButton,
-                    exportTicketTypeId === type.id && { backgroundColor: themeColor, borderColor: themeColor }
+                    styles.typeChip,
+                    exportTicketTypeId === type.id && { backgroundColor: themeColor, borderColor: themeColor },
                   ]}
                   onPress={() => setExportTicketTypeId(type.id)}
                 >
                   <Text style={[
-                    styles.typeButtonText,
-                    exportTicketTypeId === type.id && { color: '#FFF' }
+                    styles.typeChipText,
+                    exportTicketTypeId === type.id && { color: '#FFF', fontWeight: '700' },
                   ]}>{type.name}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={[styles.label, { color: theme.text }]}>Numéro de billet (optionnel)</Text>
+            <Text style={styles.exportLabel}>Plage de numéros (optionnel)</Text>
             <View style={styles.numberRange}>
               <TextInput
-                style={[styles.numberInput, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }]}
+                style={styles.numberInput}
                 placeholder="Du n°"
-                placeholderTextColor={theme.tabIconDefault}
+                placeholderTextColor="#4B5563"
                 value={exportFromNumber}
                 onChangeText={setExportFromNumber}
                 keyboardType="numeric"
               />
-              <Text style={{ color: theme.text }}>à</Text>
+              <Text style={{ color: TEXT2 }}>—</Text>
               <TextInput
-                style={[styles.numberInput, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }]}
+                style={styles.numberInput}
                 placeholder="Au n°"
-                placeholderTextColor={theme.tabIconDefault}
+                placeholderTextColor="#4B5563"
                 value={exportToNumber}
                 onChangeText={setExportToNumber}
                 keyboardType="numeric"
               />
             </View>
 
-            <View style={styles.modalButtons}>
+            <View style={styles.exportButtons}>
               <TouchableOpacity
-                style={[styles.cancelButton, { borderColor: theme.border }]}
+                style={styles.exportCancelBtn}
                 onPress={() => {
                   setShowExportOptions(false);
                   setExportTicketTypeId(null);
@@ -648,182 +642,433 @@ export default function EventDetails() {
                   setExportToNumber('');
                 }}
               >
-                <Text style={{ color: theme.text }}>Annuler</Text>
+                <Text style={styles.exportCancelText}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.confirmButton, { backgroundColor: themeColor }]}
+                style={[styles.exportConfirmBtn, { backgroundColor: themeColor }]}
                 onPress={handleConfirmExport}
               >
-                <Text style={styles.confirmButtonText}>Continuer</Text>
+                <Text style={styles.exportConfirmText}>Continuer</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
+      {/* ── Confirm modals ───────────────────────────────────────────────── */}
+      <ConfirmModal
+        visible={showDeleteConfirm}
+        title="Supprimer l'événement"
+        message="Cette action est irréversible. L'événement et tous ses billets seront supprimés."
+        onConfirm={executeDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        confirmText="Supprimer"
+        type="danger"
+      />
+
       <ConfirmModal
         visible={showExportConfirm}
         title="Exporter les billets en PDF"
-        message={`Les billets seront exportés selon les critères sélectionnés.`}
+        message="Les billets seront exportés selon les critères sélectionnés."
         onConfirm={handleDoExport}
         onCancel={() => setShowExportConfirm(false)}
         confirmText="Exporter"
-        cancelText="Annuler"
         type="primary"
-      />
-
-      <ConfirmModal
-        visible={showExportError}
-        title="Erreur"
-        message="Impossible de générer le PDF."
-        onConfirm={() => setShowExportError(false)}
-        onCancel={() => setShowExportError(false)}
-        confirmText="OK"
-        type="danger"
-        showCancel={false}
-      />
-
-      <ConfirmModal
-        visible={showSaveSuccess}
-        title="Succès"
-        message="Ajustements enregistrés."
-        onConfirm={() => setShowSaveSuccess(false)}
-        onCancel={() => setShowSaveSuccess(false)}
-        confirmText="OK"
-        type="success"
-        showCancel={false}
-      />
-
-      <ConfirmModal
-        visible={showSaveError}
-        title="Erreur"
-        message="Impossible d'enregistrer."
-        onConfirm={() => setShowSaveError(false)}
-        onCancel={() => setShowSaveError(false)}
-        confirmText="OK"
-        type="danger"
-        showCancel={false}
-      />
-
-      <ConfirmModal
-        visible={showDeleteError}
-        title="Erreur"
-        message="Impossible de supprimer l'événement."
-        onConfirm={() => setShowDeleteError(false)}
-        onCancel={() => setShowDeleteError(false)}
-        confirmText="OK"
-        type="danger"
-        showCancel={false}
       />
     </ScrollView>
   );
 }
 
+// ─── Small sub-components ───────────────────────────────────────────────────
+
+interface ActionCardProps {
+  icon?: string;
+  label: string;
+  color: string;
+  textColor: string;
+  borderColor?: string;
+  iconColor?: string;
+  onPress: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+}
+
+function ActionCard({ icon, label, color, textColor, borderColor, iconColor, onPress, disabled, loading }: ActionCardProps) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.actionCard,
+        { backgroundColor: color },
+        borderColor ? { borderColor, borderWidth: 1 } : null,
+      ]}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.75}
+    >
+      <View style={styles.actionIconWrap}>
+        {loading ? (
+          <ActivityIndicator color={textColor} size="small" />
+        ) : (
+          <MaterialCommunityIcons name={icon as any} size={24} color={iconColor ?? textColor} />
+        )}
+      </View>
+      <Text style={[styles.actionLabel, { color: textColor }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+interface AdjControlProps {
+  label: string;
+  value: string;
+  onMinus: () => void;
+  onPlus: () => void;
+  color: string;
+}
+
+function AdjControl({ label, value, onMinus, onPlus, color }: AdjControlProps) {
+  return (
+    <View style={styles.adjControl}>
+      <Text style={styles.adjControlLabel}>{label}</Text>
+      <View style={styles.adjControlRow}>
+        <TouchableOpacity style={styles.adjBtn} onPress={onMinus}>
+          <MaterialCommunityIcons name="minus" size={14} color={TEXT2} />
+        </TouchableOpacity>
+        <Text style={[styles.adjControlValue, { color }]}>{value}</Text>
+        <TouchableOpacity style={styles.adjBtn} onPress={onPlus}>
+          <MaterialCommunityIcons name="plus" size={14} color={TEXT2} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ─── Styles ─────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 20, borderBottomWidth: 1 },
-  title: { fontSize: 24, fontWeight: 'bold' },
-  date: { fontSize: 16, marginTop: 4 },
-  slogan: { fontSize: 14, fontStyle: 'italic', marginTop: 8 },
-  statsContainer: { flexDirection: 'row', marginTop: 20, paddingVertical: 15, elevation: 1, borderBottomWidth: 1 },
-  statBox: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 20, fontWeight: 'bold' },
-  statLabel: { fontSize: 12, marginTop: 4 },
-  card: { margin: 20, padding: 20, borderRadius: 12, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 3, borderWidth: 1 },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
-  financeRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  container: { flex: 1, backgroundColor: BG },
+  scrollContent: { paddingBottom: 40 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: BG },
+
+  // Hero
+  hero: {
+    backgroundColor: SURFACE,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderLeftWidth: 5,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8 },
+      android: { elevation: 3 },
+    }),
+  },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  colorDot: { width: 8, height: 8, borderRadius: 4 },
+  heroDate: { color: TEXT2, fontSize: 13, fontWeight: '600' },
+  heroName: { color: TEXT, fontSize: 20, fontWeight: '800', lineHeight: 26, marginBottom: 4 },
+  heroSlogan: { fontSize: 13, fontStyle: 'italic' },
+
+  // Stats bar
+  statsBar: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: SURFACE,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingVertical: 14,
+  },
+  statItem: { flex: 1, alignItems: 'center' },
+  statValue: { color: TEXT, fontSize: 18, fontWeight: '700' },
+  statLabel: { color: TEXT2, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 3 },
+  statDivider: { width: 1, backgroundColor: BORDER },
+
+  // Progress
+  progressTrack: {
+    marginHorizontal: 16,
+    marginTop: 6,
+    height: 3,
+    backgroundColor: SURFACE2,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: { height: '100%', borderRadius: 2 },
+
+  // Cards
+  card: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    backgroundColor: SURFACE,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  cardTitle: { color: TEXT, fontSize: 15, fontWeight: '700', marginBottom: 14 },
+
+  // Finance
+  financeRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
   financeItem: { flex: 1 },
-  financeLabel: { fontSize: 12, textTransform: 'uppercase', marginBottom: 5 },
-  financeValue: { fontSize: 18, fontWeight: 'bold' },
-  ticketTypeRow: { paddingVertical: 10 },
-  ticketTypeInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  ticketTypeName: { fontSize: 16, fontWeight: 'bold' },
-  ticketTypePrice: { fontSize: 14, fontWeight: '600' },
-  ticketTypeStats: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 8, paddingVertical: 8 },
-  ticketTypeStatItem: { flex: 1, alignItems: 'center' },
-  ticketTypeStatValue: { fontSize: 16, fontWeight: 'bold' },
-  ticketTypeStatLabel: { fontSize: 10, marginTop: 2 },
-  row: { flexDirection: 'row', marginBottom: 15 },
-  input: { borderRadius: 8, padding: 12, fontSize: 16 },
-  button: { flexDirection: 'row', borderRadius: 10, padding: 15, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  buttonText: { fontSize: 16, fontWeight: 'bold' },
-  viewTickets: { marginTop: 0, flexDirection: 'column' },
-  actionsGridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 10, gap: 15 },
-  actionCard: { width: '47%', padding: 20, borderRadius: 16, alignItems: 'center', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-  actionIconWrapper: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  actionText: { fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  previewContent: { borderRadius: 24, padding: 20, maxHeight: '85%', backgroundColor: '#111827', borderWidth: 1, borderColor: '#1E293B' },
-  previewScrollView: { flex: 1 },
-  previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  previewTitle: { fontSize: 20, fontWeight: '900', color: '#FFFFFF' },
-  toggleContainer: { flexDirection: 'row', borderRadius: 12, padding: 4, marginBottom: 20, backgroundColor: '#1E293B' },
-  toggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  toggleText: { fontWeight: 'bold' },
-  ticketContainer: { alignItems: 'center', marginBottom: 20 },
-  ticketPreview: { width: 250, height: 350, borderRadius: 16, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 5, overflow: 'hidden' },
-  ticketRecto: {},
-  ticketVerso: {},
-  rectoTopSection: { width: '100%', height: '52%', justifyContent: 'flex-start', alignItems: 'center', paddingTop: 15 },
-  rectoSlogan: { fontSize: 11, fontStyle: 'italic', color: '#000', textAlign: 'center', marginBottom: 8, paddingHorizontal: 10, opacity: 0.8 },
-  rectoTopContent: { alignItems: 'center', zIndex: 10 },
-  rectoTitle: { fontSize: 18, fontWeight: 'bold', color: '#000', marginBottom: 5, letterSpacing: 2 },
-  rectoBottomSection: { flex: 1, width: '100%', paddingHorizontal: 20, paddingVertical: 15, alignItems: 'center', justifyContent: 'space-around', borderTopLeftRadius: 80, borderTopRightRadius: 80, marginTop: -60 },
-  rectoEventInfo: { alignItems: 'center', marginTop: 10 },
-  versoLogoContainer: { flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
-  versoLogo: { width: 120, height: 120 },
-  versoDescriptionContainer: { paddingHorizontal: 20, paddingBottom: 60 },
-  versoDescription: { fontSize: 12, color: '#333', textAlign: 'center', fontStyle: 'italic', lineHeight: 18 },
-  previewEventName: { fontSize: 15, fontWeight: 'bold', textAlign: 'center', textTransform: 'uppercase' },
-  previewEventDate: { fontSize: 13, marginTop: 4, color: '#666' },
-  sloganContainer: { alignItems: 'center', paddingHorizontal: 10 },
-  previewNumBox: { backgroundColor: '#EEE', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15 },
-  previewNumText: { fontSize: 12, fontWeight: 'bold', color: '#333' },
-  previewSlogan: { fontSize: 13, fontStyle: 'italic', textAlign: 'center' },
-  versoFooter: { position: 'absolute', bottom: 15, left: 0, right: 0, alignItems: 'center', gap: 4 },
-  versoFooterText: { fontSize: 10, color: '#999', textAlign: 'center' },
-  previewHint: { fontSize: 12, textAlign: 'center', fontStyle: 'italic' },
-  adjustmentControls: { marginTop: 15, width: '100%', paddingHorizontal: 0 },
-  controlBtn: { flexDirection: 'row', padding: 12, borderRadius: 10, justifyContent: 'center', alignItems: 'center', gap: 8, width: '100%' },
-  controlBtnText: { fontWeight: 'bold' },
-  adjustmentPanel: { borderRadius: 12, padding: 15, borderWidth: 1, gap: 12 },
-  controlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
-  controlLabel: { fontSize: 13, fontWeight: '600' },
-  moveControls: { alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
-  controlButtonsRow: { flexDirection: 'row', gap: 10, paddingTop: 10, borderTopWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
-  actionBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
-  actionBtnText: { fontWeight: 'bold' },
-  adjustmentSection: { paddingVertical: 10 },
-  adjustmentLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
-  sliderRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  adjustmentBtn: { width: 36, height: 36, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  sliderTrack: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
-  sliderFill: { height: '100%', borderRadius: 3 },
-  adjustmentValue: { fontSize: 12, fontWeight: 'bold', textAlign: 'center', marginTop: 4 },
-  moveGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 4, width: 120, alignSelf: 'center' },
-  moveBtn: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  moveBtnReset: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  adjustmentPanelCompact: { borderRadius: 10, padding: 10, borderWidth: 1, gap: 8 },
-  adjCompactRow: { flexDirection: 'row', justifyContent: 'space-around' },
-  adjCompactItem: { alignItems: 'center' },
-  adjCompactLabel: { fontSize: 10, fontWeight: '600', marginBottom: 4 },
-  adjCompactControls: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  adjCompactBtn: { width: 28, height: 28, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
-  adjCompactValue: { fontSize: 11, fontWeight: 'bold', minWidth: 30, textAlign: 'center' },
-  adjCompactMoveRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 4 },
-  deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1 },
-  deleteButtonText: { fontWeight: 'bold' },
-  modalContent: { width: '85%', padding: 20, borderRadius: 12, elevation: 5 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  label: { fontSize: 14, fontWeight: '600', marginTop: 15, marginBottom: 8 },
+  financeLabel: { color: TEXT2, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  financeValue: { fontSize: 17, fontWeight: '700', color: TEXT },
+  financeTotalRow: {
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+    paddingTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  // Ticket types
+  typeRow: { paddingVertical: 10 },
+  typeRowBorder: { borderBottomWidth: 1, borderBottomColor: BORDER, marginBottom: 10 },
+  typeInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  typeName: { fontSize: 15, fontWeight: '700' },
+  typePrice: { color: TEXT2, fontSize: 13, fontWeight: '600' },
+  typeStats: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 8,
+    paddingVertical: 8,
+  },
+  typeStatItem: { flex: 1, alignItems: 'center' },
+  typeStatBorder: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: BORDER },
+  typeStatValue: { fontSize: 15, fontWeight: '700', color: TEXT },
+  typeStatLabel: { color: TEXT2, fontSize: 9, marginTop: 2, textTransform: 'uppercase' },
+
+  // Actions grid
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 14,
+  },
+  actionCard: {
+    width: '47%',
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+      android: { elevation: 2 },
+    }),
+  },
+  actionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  actionLabel: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
+
+  // Delete
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 10,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.3)',
+  },
+  deleteBtnText: { color: DANGER, fontSize: 15, fontWeight: '600' },
+
+  // Modal overlay
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+
+  // Ticket preview sheet
+  previewSheet: {
+    width: '100%',
+    backgroundColor: SURFACE,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+    maxHeight: '90%',
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  previewTitle: { color: TEXT, fontSize: 17, fontWeight: '800' },
+  previewHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+
+  // Recto/Verso toggle
+  toggle: {
+    flexDirection: 'row',
+    backgroundColor: SURFACE2,
+    borderRadius: 10,
+    padding: 3,
+    marginBottom: 16,
+  },
+  toggleBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
+  toggleText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+
+  // Ticket card
+  ticketContainer: { alignItems: 'center', marginBottom: 16 },
+  ticketPreview: {
+    width: 240,
+    height: 340,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#FFF',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 },
+      android: { elevation: 6 },
+    }),
+  },
+  ticketHidden: { position: 'absolute', opacity: 0, zIndex: -1 },
+
+  // Recto
+  rectoTop: {
+    width: '100%',
+    height: '52%',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 14,
+  },
+  rectoSlogan: { fontSize: 10, fontStyle: 'italic', color: '#000', opacity: 0.75, marginBottom: 6, paddingHorizontal: 8, textAlign: 'center' },
+  rectoLabel: { fontSize: 16, fontWeight: '800', color: '#000', letterSpacing: 2, marginBottom: 4 },
+  rectoBottom: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopLeftRadius: 72,
+    borderTopRightRadius: 72,
+    marginTop: -52,
+    backgroundColor: '#FFF',
+  },
+  rectoEventName: { fontSize: 13, fontWeight: '800', textAlign: 'center', textTransform: 'uppercase' },
+  rectoEventDate: { fontSize: 11, color: '#666', marginTop: 2 },
+  rectoNumBox: { backgroundColor: '#EEE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  rectoNumText: { fontSize: 11, fontWeight: '700', color: '#333' },
+
+  // Verso
+  versoCenter: { flex: 1, justifyContent: 'center', alignItems: 'center', zIndex: 10 },
+  versoLogo: { width: 110, height: 110 },
+  versoDescBox: { paddingHorizontal: 16, paddingBottom: 50, zIndex: 10 },
+  versoDesc: { fontSize: 10, color: '#333', textAlign: 'center', fontStyle: 'italic', lineHeight: 16 },
+
+  // Adjustment section
+  adjSection: { marginTop: 12 },
+  adjToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  adjToggleBtnText: { fontSize: 14, fontWeight: '600' },
+  adjPanel: {
+    backgroundColor: SURFACE2,
+    borderRadius: 10,
+    padding: 12,
+    gap: 10,
+  },
+  adjRow: { flexDirection: 'row', gap: 12 },
+  adjControl: { flex: 1, alignItems: 'center', gap: 6 },
+  adjControlLabel: { color: TEXT2, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  adjControlRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  adjControlValue: { fontSize: 12, fontWeight: '700', minWidth: 36, textAlign: 'center' },
+  adjBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 6,
+    backgroundColor: SURFACE,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adjMoveGrid: { alignItems: 'center', gap: 4 },
+  adjMoveRow: { flexDirection: 'row', gap: 4, justifyContent: 'center' },
+  adjMoveBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: SURFACE,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  adjActions: { flexDirection: 'row', gap: 10, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 10 },
+  adjCancelBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: '#374151',
+  },
+  adjCancelText: { color: TEXT, fontSize: 14, fontWeight: '600' },
+  adjSaveBtn: { flex: 2, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+  adjSaveText: { color: '#000', fontSize: 14, fontWeight: '700' },
+
+  previewHint: { color: TEXT2, fontSize: 11, textAlign: 'center', fontStyle: 'italic', marginTop: 8 },
+
+  // Export sheet
+  exportSheet: {
+    width: '100%',
+    backgroundColor: SURFACE,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  exportTitle: { color: TEXT, fontSize: 17, fontWeight: '800', marginBottom: 16, textAlign: 'center' },
+  exportLabel: { color: TEXT2, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, marginTop: 14 },
   typeSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#CCC' },
-  typeButtonText: { fontSize: 13 },
+  typeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: SURFACE2,
+  },
+  typeChipText: { color: TEXT2, fontSize: 13 },
   numberRange: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  numberInput: { flex: 1, padding: 10, borderRadius: 8, borderWidth: 1 },
-  modalButtons: { flexDirection: 'row', marginTop: 25, gap: 12 },
-  cancelButton: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center', borderWidth: 1 },
-  confirmButton: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
-  confirmButtonText: { color: '#FFF', fontWeight: 'bold' }
+  numberInput: {
+    flex: 1,
+    backgroundColor: SURFACE2,
+    borderRadius: 10,
+    padding: 10,
+    color: TEXT,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  exportButtons: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  exportCancelBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  exportCancelText: { color: TEXT2, fontWeight: '600' },
+  exportConfirmBtn: { flex: 1.5, paddingVertical: 13, borderRadius: 10, alignItems: 'center' },
+  exportConfirmText: { color: '#FFF', fontWeight: '700' },
 });
