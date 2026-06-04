@@ -260,6 +260,7 @@ const styles = StyleSheet.create({
   pageItem: {
     width: CARD_WIDTH,
     justifyContent: 'center',
+    height: Dimensions.get('window').height - 200,
   },
   listContent: {
     padding: 16,

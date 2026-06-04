@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Platform,
+  ImageBackground,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Event } from '../services/EventService';
@@ -62,60 +63,130 @@ const EventCard: React.FC<EventCardProps> = ({
       onPress={onPress}
       activeOpacity={0.75}
     >
-      {/* Accent stripe at top */}
-      <View style={[styles.topAccent, { backgroundColor: accentColor + '22' }]}>
-        <View style={styles.topAccentInner}>
-          <MaterialCommunityIcons name="calendar-star" size={18} color={accentColor} />
-          <Text style={[styles.accentDate, { color: accentColor }]}>{formattedDate}</Text>
-        </View>
-        {showActions && (
-          <View style={styles.actionRow}>
-            {onEdit && (
-              <TouchableOpacity style={styles.actionBtn} onPress={onEdit} activeOpacity={0.7}>
-                <MaterialCommunityIcons name="pencil" size={17} color="#6366F1" />
-              </TouchableOpacity>
+      {event.image ? (
+        <ImageBackground
+          source={{ uri: event.image }}
+          style={styles.imageBackground}
+          imageStyle={styles.backgroundImage}
+        >
+          <View style={styles.imageOverlay}>
+            {/* Accent stripe at top */}
+            <View style={[styles.topAccent, { backgroundColor: accentColor + '22' }]}>
+              <View style={styles.topAccentInner}>
+                <MaterialCommunityIcons name="calendar-star" size={18} color={accentColor} />
+                <Text style={[styles.accentDate, { color: accentColor }]}>{formattedDate}</Text>
+              </View>
+              {showActions && (
+                <View style={styles.actionRow}>
+                  {onEdit && (
+                    <TouchableOpacity style={styles.actionBtn} onPress={onEdit} activeOpacity={0.7}>
+                      <MaterialCommunityIcons name="pencil" size={17} color="#6366F1" />
+                    </TouchableOpacity>
+                  )}
+                  {onDelete && (
+                    <TouchableOpacity style={styles.actionBtnDanger} onPress={onDelete} activeOpacity={0.7}>
+                      <MaterialCommunityIcons name="trash-can-outline" size={17} color="#EF4444" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
+
+            {/* Spacer */}
+            <View style={{ flex: 1 }} />
+
+            {/* Body at bottom */}
+            <View style={[styles.body, styles.bodyOnImage]}>
+              <Text style={styles.name} numberOfLines={2}>{event.name}</Text>
+              {event.slogan ? (
+                <Text style={styles.slogan} numberOfLines={1}>{event.slogan}</Text>
+              ) : null}
+            </View>
+
+            {/* Footer stats */}
+            <View style={[styles.footer, styles.footerOnImage]}>
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Text style={[styles.statValue, { color: accentColor }]}>{sold}</Text>
+                  <Text style={styles.statLabel}>Vendus</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValueNeutral}>{total}</Text>
+                  <Text style={styles.statLabel}>Total</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValueNeutral}>{fillPercent}%</Text>
+                  <Text style={styles.statLabel}>Remplissage</Text>
+                </View>
+              </View>
+
+              {/* Progress bar */}
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${fillPercent}%` as any, backgroundColor: accentColor }]} />
+              </View>
+            </View>
+          </View>
+        </ImageBackground>
+      ) : (
+        <>
+          {/* Accent stripe at top */}
+          <View style={[styles.topAccent, { backgroundColor: accentColor + '22' }]}>
+            <View style={styles.topAccentInner}>
+              <MaterialCommunityIcons name="calendar-star" size={18} color={accentColor} />
+              <Text style={[styles.accentDate, { color: accentColor }]}>{formattedDate}</Text>
+            </View>
+            {showActions && (
+              <View style={styles.actionRow}>
+                {onEdit && (
+                  <TouchableOpacity style={styles.actionBtn} onPress={onEdit} activeOpacity={0.7}>
+                    <MaterialCommunityIcons name="pencil" size={17} color="#6366F1" />
+                  </TouchableOpacity>
+                )}
+                {onDelete && (
+                  <TouchableOpacity style={styles.actionBtnDanger} onPress={onDelete} activeOpacity={0.7}>
+                    <MaterialCommunityIcons name="trash-can-outline" size={17} color="#EF4444" />
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
-            {onDelete && (
-              <TouchableOpacity style={styles.actionBtnDanger} onPress={onDelete} activeOpacity={0.7}>
-                <MaterialCommunityIcons name="trash-can-outline" size={17} color="#EF4444" />
-              </TouchableOpacity>
-            )}
           </View>
-        )}
-      </View>
 
-      {/* Body */}
-      <View style={styles.body}>
-        <Text style={styles.name} numberOfLines={2}>{event.name}</Text>
-        {event.slogan ? (
-          <Text style={styles.slogan} numberOfLines={1}>{event.slogan}</Text>
-        ) : null}
-      </View>
+          {/* Body */}
+          <View style={styles.body}>
+            <Text style={styles.name} numberOfLines={2}>{event.name}</Text>
+            {event.slogan ? (
+              <Text style={styles.slogan} numberOfLines={1}>{event.slogan}</Text>
+            ) : null}
+          </View>
 
-      {/* Footer stats */}
-      <View style={styles.footer}>
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: accentColor }]}>{sold}</Text>
-            <Text style={styles.statLabel}>Vendus</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValueNeutral}>{total}</Text>
-            <Text style={styles.statLabel}>Total</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValueNeutral}>{fillPercent}%</Text>
-            <Text style={styles.statLabel}>Remplissage</Text>
-          </View>
-        </View>
+          {/* Footer stats */}
+          <View style={styles.footer}>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: accentColor }]}>{sold}</Text>
+                <Text style={styles.statLabel}>Vendus</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValueNeutral}>{total}</Text>
+                <Text style={styles.statLabel}>Total</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValueNeutral}>{fillPercent}%</Text>
+                <Text style={styles.statLabel}>Remplissage</Text>
+              </View>
+            </View>
 
-        {/* Progress bar */}
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${fillPercent}%` as any, backgroundColor: accentColor }]} />
-        </View>
-      </View>
+            {/* Progress bar */}
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${fillPercent}%` as any, backgroundColor: accentColor }]} />
+            </View>
+          </View>
+        </>
+      )}
     </TouchableOpacity>
   );
 };
@@ -129,10 +200,31 @@ const styles = StyleSheet.create({
     borderColor: '#1E293B',
     borderLeftWidth: 5,
     overflow: 'hidden',
+    minHeight: 480,
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8 },
       android: { elevation: 3 },
     }),
+  },
+  imageBackground: {
+    flex: 1,
+    justifyContent: 'flex-start',
+  },
+  backgroundImage: {
+    borderRadius: 16,
+  },
+  imageOverlay: {
+    flex: 1,
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    borderRadius: 16,
+  },
+  bodyOnImage: {
+    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+  },
+  footerOnImage: {
+    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+    borderTopColor: 'rgba(30, 41, 59, 0.6)',
   },
   topAccent: {
     flexDirection: 'row',
