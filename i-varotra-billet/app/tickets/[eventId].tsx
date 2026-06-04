@@ -45,7 +45,6 @@ export default function TicketList() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ticketTypes, setTicketTypes] = useState<any[]>([]);
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
-  const [eventImage, setEventImage] = useState<string | undefined>();
 
   // Search
   const [search, setSearch] = useState('');
@@ -64,8 +63,6 @@ export default function TicketList() {
   const fetchTickets = useCallback(() => {
     setTickets(TicketService.getTicketsByEvent(id));
     setTicketTypes(EventService.getTicketTypes(id));
-    const event = EventService.getEventById(id);
-    setEventImage(event?.image);
   }, [id]);
 
   useFocusEffect(useCallback(() => { fetchTickets(); }, [fetchTickets]));
@@ -197,7 +194,6 @@ export default function TicketList() {
       isSelected={selectedIds.includes(item.id!)}
       selectionMode={selectionMode}
       role={role}
-      eventImage={eventImage}
       onPress={handlePress}
       onLongPress={handleLongPress}
       onResetVerification={handleResetVerification}
