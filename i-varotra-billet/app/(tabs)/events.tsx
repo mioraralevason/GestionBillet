@@ -25,7 +25,8 @@ import { useRole } from '../../hooks/useRole';
 import { useEventSearch } from '../../hooks/useEventSearch';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = width - 32;
+const CARD_WIDTH = width - 40;
+const PEEK_AMOUNT = 20;
 
 export default function EventsList() {
   const [events, setEvents] = useState<(Event & { stats?: any })[]>([]);
@@ -183,14 +184,15 @@ export default function EventsList() {
             data={filtered}
             keyExtractor={(item) => item.id?.toString() ?? ''}
             horizontal
-            pagingEnabled
+            pagingEnabled={false}
             showsHorizontalScrollIndicator={false}
-            snapToInterval={CARD_WIDTH + 12}
+            snapToInterval={CARD_WIDTH + 20}
             decelerationRate="fast"
             contentContainerStyle={styles.horizontalContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />}
+            scrollEventThrottle={16}
             onMomentumScrollEnd={(e) => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + 12));
+              const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + 20));
               setCurrentIndex(idx);
             }}
             renderItem={({ item }) => (
@@ -250,13 +252,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   horizontalContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 4,
-    gap: 12,
+    gap: 20,
   },
   pageItem: {
     width: CARD_WIDTH,
+    justifyContent: 'center',
   },
   listContent: {
     padding: 16,

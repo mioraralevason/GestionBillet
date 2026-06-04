@@ -322,29 +322,26 @@ export default function AssignTicket() {
                     <Text style={styles.buyerNewText}>Nouvel acheteur</Text>
                   </TouchableOpacity>
 
-                  <FlatList
-                    data={filteredBuyers}
-                    keyExtractor={b => b.id!.toString()}
-                    style={styles.buyerList}
-                    keyboardShouldPersistTaps="handled"
-                    renderItem={({ item }) => (
-                      <TouchableOpacity style={styles.buyerItem} onPress={() => selectBuyer(item)}>
-                        <View style={styles.buyerItemAvatar}>
-                          <Text style={styles.buyerItemAvatarText}>{item.name.charAt(0).toUpperCase()}</Text>
-                        </View>
-                        <View style={styles.buyerItemInfo}>
-                          <Text style={styles.buyerItemName}>{item.name}</Text>
-                          {item.phone && <Text style={styles.buyerItemPhone}>{item.phone}</Text>}
-                        </View>
-                        {buyerName === item.name && (
-                          <MaterialCommunityIcons name="check-circle" size={18} color={SUCCESS} />
-                        )}
-                      </TouchableOpacity>
-                    )}
-                    ListEmptyComponent={
-                      <Text style={styles.buyerEmptyText}>Aucun acheteur trouve</Text>
-                    }
-                  />
+                  {filteredBuyers.length === 0 ? (
+                    <Text style={styles.buyerEmptyText}>Aucun acheteur trouve</Text>
+                  ) : (
+                    <View style={styles.buyerList}>
+                      {filteredBuyers.map(item => (
+                        <TouchableOpacity key={item.id!.toString()} style={styles.buyerItem} onPress={() => selectBuyer(item)}>
+                          <View style={styles.buyerItemAvatar}>
+                            <Text style={styles.buyerItemAvatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+                          </View>
+                          <View style={styles.buyerItemInfo}>
+                            <Text style={styles.buyerItemName}>{item.name}</Text>
+                            {item.phone && <Text style={styles.buyerItemPhone}>{item.phone}</Text>}
+                          </View>
+                          {buyerName === item.name && (
+                            <MaterialCommunityIcons name="check-circle" size={18} color={SUCCESS} />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
               )}
 
