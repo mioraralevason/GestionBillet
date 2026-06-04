@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Ticket, TicketService } from '../services/TicketService';
 
@@ -14,6 +14,7 @@ interface TicketCardProps {
   isSelected?: boolean;
   selectionMode?: boolean;
   role?: string | null;
+  eventImage?: string;
   onPress: (item: Ticket) => void;
   onLongPress: (id: number) => void;
   onResetVerification?: (item: Ticket) => void;
@@ -24,6 +25,7 @@ export const TicketCard: React.FC<TicketCardProps> = memo(({
   isSelected = false,
   selectionMode = false,
   role,
+  eventImage,
   onPress,
   onLongPress,
   onResetVerification,
@@ -42,17 +44,8 @@ export const TicketCard: React.FC<TicketCardProps> = memo(({
     ? STATUS_COLORS.sold
     : STATUS_COLORS.available;
 
-  return (
-    <TouchableOpacity
-      style={[
-        styles.card,
-        isSelected && styles.cardSelected,
-        { borderLeftColor: accentColor },
-      ]}
-      onPress={() => onPress(item)}
-      onLongPress={() => onLongPress(item.id!)}
-      activeOpacity={0.7}
-    >
+  const cardContent = (
+    <>
       {/* Selection checkbox */}
       {selectionMode && (
         <View style={styles.checkboxWrapper}>
@@ -65,7 +58,7 @@ export const TicketCard: React.FC<TicketCardProps> = memo(({
       )}
 
       {/* Main content */}
-      <View style={styles.body}>
+      <View style={[styles.body, eventImage && styles.bodyOnImage]}>
         {/* Row 1: ticket number + status badge */}
         <View style={styles.topRow}>
           <Text style={styles.ticketNum} numberOfLines={1}>{item.ticket_number}</Text>
@@ -100,7 +93,7 @@ export const TicketCard: React.FC<TicketCardProps> = memo(({
       </View>
 
       {/* Right: price & payment */}
-      <View style={styles.right}>
+      <View style={[styles.right, eventImage && styles.rightOnImage]}>
         <Text style={styles.price}>{item.price.toLocaleString()} Ar</Text>
         {isSold && remaining > 0 && (
           <Text style={styles.remaining}>-{remaining.toLocaleString()} Ar</Text>
@@ -115,6 +108,33 @@ export const TicketCard: React.FC<TicketCardProps> = memo(({
           </TouchableOpacity>
         )}
       </View>
+    </>
+  );
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.card,
+        isSelected && styles.cardSelected,
+        { borderLeftColor: accentColor },
+      ]}
+      onPress={() => onPress(item)}
+      onLongPress={() => onLongPress(item.id!)}
+      activeOpacity={0.7}
+    >
+      {eventImage ? (
+        <ImageBackground
+          source={{ uri: eventImage }}
+          style={styles.imageBackground}
+          imageStyle={styles.backgroundImage}
+        >
+          <View style={styles.imageOverlay}>
+            {cardContent}
+          </View>
+        </ImageBackground>
+      ) : (
+        cardContent
+      )}
     </TouchableOpacity>
   );
 });
@@ -137,6 +157,19 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     backgroundColor: 'rgba(99,102,241,0.06)',
   },
+  imageBackground: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  backgroundImage: {
+    borderRadius: 14,
+  },
+  imageOverlay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 14,
+  },
   checkboxWrapper: {
     paddingLeft: 12,
   },
@@ -145,6 +178,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingLeft: 12,
     paddingRight: 4,
+  },
+  bodyOnImage: {
+    backgroundColor: 'rgba(17, 24, 39, 0.8)',
   },
   topRow: {
     flexDirection: 'row',
@@ -208,6 +244,9 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     paddingVertical: 12,
     minWidth: 80,
+  },
+  rightOnImage: {
+    backgroundColor: 'rgba(30, 41, 59, 0.8)',
   },
   price: {
     color: '#FFFFFF',

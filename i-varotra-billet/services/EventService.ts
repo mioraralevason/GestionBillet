@@ -48,6 +48,15 @@ export const EventService = {
     }
   },
 
+  getEventById: (id: number): Event | null => {
+    try {
+      return db.getFirstSync(`SELECT * FROM events WHERE id = ?`, id) || null;
+    } catch (error) {
+      console.error('Error fetching event', error);
+      return null;
+    }
+  },
+
   /**
    * Retrieves all ticket types for a specific event.
    * @param {number} eventId - The ID of the event.
