@@ -66,6 +66,10 @@ export default function EventDetails() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showExportConfirm, setShowExportConfirm] = useState(false);
 
+  const date = event?.event_date ? new Date(event.event_date) : null;
+  const day = date ? date.toLocaleDateString('fr-FR', { day: '2-digit' }) : '--';
+  const month = date ? date.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '').toUpperCase() : '---';
+  const year = date ? date.getFullYear() : '';
   const themeColor = event?.color || '#6366F1';
 
   const fetchData = useCallback(async () => {
@@ -224,14 +228,23 @@ export default function EventDetails() {
 
       {/* ── Hero header ─────────────────────────────────────────────────── */}
       <View style={[styles.hero, { borderLeftColor: themeColor }]}>
-        <View style={styles.heroTop}>
-          <View style={[styles.colorDot, { backgroundColor: themeColor }]} />
-          <Text style={styles.heroDate}>{event.event_date}</Text>
+        <View style={styles.heroContentRow}>
+          <View style={styles.heroTextCol}>
+            <Text style={styles.heroName}>{event.name}</Text>
+            {event.slogan ? (
+              <Text style={[styles.heroSlogan, { color: themeColor }]}>{event.slogan}</Text>
+            ) : null}
+          </View>
+          {date && (
+            <View style={[styles.detailCalBadge, { borderColor: themeColor + '50' }]}>
+              <View style={[styles.detailCalHeader, { backgroundColor: themeColor }]}>
+                <Text style={styles.detailCalMonth}>{month}</Text>
+              </View>
+              <Text style={styles.detailCalDay}>{day}</Text>
+              <Text style={styles.detailCalYear}>{year}</Text>
+            </View>
+          )}
         </View>
-        <Text style={styles.heroName}>{event.name}</Text>
-        {event.slogan ? (
-          <Text style={[styles.heroSlogan, { color: themeColor }]}>{event.slogan}</Text>
-        ) : null}
       </View>
 
       {/* ── Stats bar ───────────────────────────────────────────────────── */}
@@ -764,11 +777,52 @@ const styles = StyleSheet.create({
       android: { elevation: 3 },
     }),
   },
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  heroContentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 14,
+  },
+  heroTextCol: { flex: 1, gap: 4 },
   colorDot: { width: 8, height: 8, borderRadius: 4 },
-  heroDate: { color: TEXT2, fontSize: 13, fontWeight: '600' },
-  heroName: { color: TEXT, fontSize: 20, fontWeight: '800', lineHeight: 26, marginBottom: 4 },
+  heroName: { color: TEXT, fontSize: 20, fontWeight: '800', lineHeight: 26 },
   heroSlogan: { fontSize: 13, fontStyle: 'italic' },
+  detailCalBadge: {
+    width: 52,
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: 'hidden',
+    alignItems: 'center',
+    backgroundColor: SURFACE2,
+    flexShrink: 0,
+  },
+  detailCalHeader: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  detailCalMonth: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  detailCalDay: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '800',
+    lineHeight: 24,
+    marginTop: 2,
+  },
+  detailCalYear: {
+    color: '#6B7280',
+    fontSize: 9,
+    fontWeight: '600',
+    paddingBottom: 2,
+  },
 
   // Stats bar
   statsBar: {
