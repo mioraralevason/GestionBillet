@@ -278,7 +278,7 @@ export default function TicketList() {
             style={[styles.chip, selectedTypeId === null && styles.chipActive]}
             onPress={() => setSelectedTypeId(null)}
           >
-            <MaterialCommunityIcons name="ticket-outline" size={14} color={selectedTypeId === null ? '#000' : '#6366F1'} />
+            <MaterialCommunityIcons name="ticket-outline" size={14} style={selectedTypeId === null ? styles.chipIconActiveStyle : styles.chipIconStyle} />
             <Text style={[styles.chipText, selectedTypeId === null && styles.chipTextActive]}>Tous</Text>
           </TouchableOpacity>
 
@@ -288,7 +288,7 @@ export default function TicketList() {
               style={[styles.chip, selectedTypeId === type.id && styles.chipActive]}
               onPress={() => setSelectedTypeId(type.id)}
             >
-              <MaterialCommunityIcons name="ticket" size={14} color={selectedTypeId === type.id ? '#000' : '#6366F1'} />
+              <MaterialCommunityIcons name="ticket" size={14} style={selectedTypeId === type.id ? styles.chipIconActiveStyle : styles.chipIconStyle} />
               <Text style={[styles.chipText, selectedTypeId === type.id && styles.chipTextActive]}>{type.name}</Text>
             </TouchableOpacity>
           ))}
@@ -453,37 +453,45 @@ const styles = StyleSheet.create({
 
   // ── Filter chips ──────────────────────────────────────────────────────────
   filterScroll: {
-    maxHeight: 48,
     marginTop: 8,
+    overflow: 'visible',
   },
   filterContent: {
     paddingHorizontal: 16,
+    paddingVertical: 4,
     gap: 8,
     alignItems: 'center',
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 20,
     backgroundColor: '#111827',
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: '#475569',
+    flexShrink: 0,
+    height: 38,
   },
   chipActive: {
     backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
+    borderColor: '#818CF8',
   },
+  chipIconStyle: { color: '#E2E8F0' },
+  chipIconActiveStyle: { color: '#FFFFFF' },
   chipText: {
-    color: '#6366F1',
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
+    lineHeight: 20,
   },
   chipTextActive: {
-    color: '#000000',
+    color: '#FFFFFF',
     fontWeight: '700',
+    lineHeight: 20,
   },
 
   // ── Counter header ────────────────────────────────────────────────────────
@@ -512,7 +520,7 @@ const styles = StyleSheet.create({
   counterSold: { color: '#6366F1' },
   counterVerified: { color: '#10B981' },
   counterLabel: {
-    color: '#4B5563',
+    color: '#64748B',
     fontSize: 10,
     textTransform: 'uppercase',
     letterSpacing: 0.5,

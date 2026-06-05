@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   buyerAvailable: {
-    color: '#334155',
+    color: '#94A3B8',
     fontStyle: 'italic',
   },
   phoneRow: {
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   phoneText: {
-    color: '#4B5563',
+    color: '#64748B',
     fontSize: 11,
   },
   right: {
