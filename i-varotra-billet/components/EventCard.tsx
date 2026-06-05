@@ -50,8 +50,19 @@ const EventCard: React.FC<EventCardProps> = ({
         <View style={[styles.compactDot, { backgroundColor: accentColor }]} />
         <View style={styles.compactContent}>
           <Text style={styles.compactName} numberOfLines={1}>{event.name}</Text>
-          <Text style={styles.compactDate}>{formattedDate}</Text>
+          {event.slogan ? (
+            <Text style={styles.compactSlogan} numberOfLines={1}>{event.slogan}</Text>
+          ) : null}
         </View>
+        {event.event_date && (
+          <View style={[styles.compactDateBadge, { borderColor: accentColor + '50' }]}>
+            <View style={[styles.compactDateBadgeTop, { backgroundColor: accentColor }]}>
+              <Text style={styles.compactDateDay}>{new Date(event.event_date).toLocaleDateString('fr-FR', { day: '2-digit' })}</Text>
+            </View>
+            <Text style={styles.compactDateMonth}>{new Date(event.event_date).toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '').toUpperCase()}</Text>
+            <Text style={styles.compactDateYear}>{new Date(event.event_date).getFullYear()}</Text>
+          </View>
+        )}
         <MaterialCommunityIcons name="chevron-right" size={18} color="#4B5563" />
       </TouchableOpacity>
     );
@@ -100,6 +111,9 @@ const EventCard: React.FC<EventCardProps> = ({
               <Text style={styles.name} numberOfLines={2}>{event.name}</Text>
               {event.slogan ? (
                 <Text style={styles.slogan} numberOfLines={1}>{event.slogan}</Text>
+              ) : null}
+              {formattedDate ? (
+                <Text style={styles.dateBody}>{formattedDate}</Text>
               ) : null}
             </View>
 
@@ -158,6 +172,9 @@ const EventCard: React.FC<EventCardProps> = ({
             <Text style={styles.name} numberOfLines={2}>{event.name}</Text>
             {event.slogan ? (
               <Text style={styles.slogan} numberOfLines={1}>{event.slogan}</Text>
+            ) : null}
+            {formattedDate ? (
+              <Text style={styles.dateBody}>{formattedDate}</Text>
             ) : null}
           </View>
 
@@ -278,6 +295,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontStyle: 'italic',
   },
+  dateBody: {
+    color: '#CBD5E1',
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 4,
+  },
   footer: {
     borderTopWidth: 1,
     borderTopColor: '#1E293B',
@@ -352,9 +375,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 3,
   },
-  compactDate: {
+  compactSlogan: {
     color: '#64748B',
-    fontSize: 12,
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
+  compactDateBadge: {
+    width: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
+  compactDateBadgeTop: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  compactDateDay: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  compactDateMonth: {
+    color: '#CBD5E1',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    paddingTop: 3,
+  },
+  compactDateYear: {
+    color: '#4B5563',
+    fontSize: 9,
+    fontWeight: '500',
+    paddingBottom: 4,
   },
 });
 

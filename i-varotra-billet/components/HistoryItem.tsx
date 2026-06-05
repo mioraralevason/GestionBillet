@@ -31,27 +31,32 @@ const HistoryItem: React.FC<HistoryItemProps> = ({ event, onPress, onEdit, onDel
 
   return (
     <TouchableOpacity style={styles.item} onPress={onPress} activeOpacity={0.75}>
-      {/* Left: image or date block */}
+      {/* Left: image or empty */}
       <View style={styles.leftContainer}>
         {event.image ? (
           <Image source={{ uri: event.image }} style={styles.eventImage} />
-        ) : (
-          <View style={[styles.dateBadge, { borderColor: accentColor + '50' }]}>
-            <View style={[styles.dateBadgeTop, { backgroundColor: accentColor }]}>
-              <Text style={styles.dateDay}>{day}</Text>
-            </View>
-            <Text style={styles.dateMonth}>{month}</Text>
-            <Text style={styles.dateYear}>{year}</Text>
-          </View>
-        )}
+        ) : null}
       </View>
 
       {/* Center: event info */}
       <View style={styles.itemContent}>
-        <Text style={styles.itemName} numberOfLines={1}>{event.name}</Text>
-        {event.slogan ? (
-          <Text style={styles.itemSlogan} numberOfLines={1}>{event.slogan}</Text>
-        ) : null}
+        <View style={styles.contentRow}>
+          <View style={styles.contentLeft}>
+            <Text style={styles.itemName} numberOfLines={1}>{event.name}</Text>
+            {event.slogan ? (
+              <Text style={styles.itemSlogan} numberOfLines={1}>{event.slogan}</Text>
+            ) : null}
+          </View>
+          {date && (
+            <View style={[styles.miniCalBadge, { borderColor: accentColor + '50' }]}>
+              <View style={[styles.miniCalHeader, { backgroundColor: accentColor }]}>
+                <Text style={styles.miniCalMonth}>{month}</Text>
+              </View>
+              <Text style={styles.miniCalDay}>{day}</Text>
+              <Text style={styles.miniCalYear}>{year}</Text>
+            </View>
+          )}
+        </View>
 
         {/* Stats row */}
         <View style={styles.statsRow}>
@@ -155,10 +160,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     paddingBottom: 4,
   },
-  // Content
+  // Content layout
   itemContent: {
     flex: 1,
     gap: 4,
+    justifyContent: 'center',
+  },
+  contentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  contentLeft: {
+    flex: 1,
+    gap: 2,
   },
   itemName: {
     color: '#FFFFFF',
@@ -169,6 +185,43 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontSize: 11,
     fontStyle: 'italic',
+  },
+  // Mini calendar badge (right side)
+  miniCalBadge: {
+    width: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: 'hidden',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    flexShrink: 0,
+  },
+  miniCalHeader: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  miniCalMonth: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  miniCalDay: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 22,
+    marginTop: 2,
+  },
+  miniCalYear: {
+    color: '#6B7280',
+    fontSize: 8,
+    fontWeight: '600',
+    paddingBottom: 2,
   },
   statsRow: {
     flexDirection: 'row',
