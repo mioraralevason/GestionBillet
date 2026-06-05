@@ -17,6 +17,7 @@ import { TicketService } from '../../services/TicketService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRole } from '../../hooks/useRole';
 import EventCard from '../../components/EventCard';
+import HistoryItem from '../../components/HistoryItem';
 import { IconButton } from '../../components/ui/IconButton';
 import MonthYearPicker from '../../components/Pickers/MonthYearPicker';
 
@@ -84,8 +85,6 @@ export default function Home() {
   const [endDate, setEndDate] = useState<Date | null>(new Date(currentYear, 11, 1));
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-  const [historyIndex, setHistoryIndex] = useState(0);
-  const historyRef = useRef<FlatList>(null);
 
   const fetchData = useCallback(async () => {
     setEvents(EventService.getEvents());
@@ -137,7 +136,7 @@ export default function Home() {
 
   // Add stats to history items for EventCard
   const historyWithStats = useMemo(() =>
-    filteredHistory.map(e => ({ ...e, stats: TicketService.getEventStats(e.id!) })),
+    filteredHistory.slice(0, 3).map(e => ({ ...e, stats: TicketService.getEventStats(e.id!) })),
     [filteredHistory]
   );
 
@@ -208,7 +207,7 @@ export default function Home() {
 
         {/* Historique Section */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Historique</Text>
+          <Text style={styles.sectionTitle}>Les 3 derniers</Text>
           <TouchableOpacity onPress={() => router.push('/(tabs)/events' as any)} activeOpacity={0.7}>
             <Text style={styles.sectionLink}>Voir tout</Text>
           </TouchableOpacity>
@@ -220,44 +219,16 @@ export default function Home() {
             <Text style={styles.emptyText}>Aucun événement sur cette période</Text>
           </View>
         ) : (
-          <>
-            <FlatList
-              ref={historyRef}
-              data={historyWithStats}
-              keyExtractor={item => item.id?.toString() ?? ''}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={CARD_WIDTH + 12}
-              decelerationRate="fast"
-              contentContainerStyle={styles.historyList}
-              scrollEnabled
-              onMomentumScrollEnd={e => {
-                const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + 12));
-                setHistoryIndex(idx);
-              }}
-              renderItem={({ item }) => (
-                <View style={styles.historyItem}>
-                  <EventCard
-                    event={item}
-                    onPress={() => router.push(`/event/${item.id}`)}
-                    showActions={false}
-                  />
-                </View>
-              )}
-            />
-
-            {historyWithStats.length > 1 && (
-              <View style={styles.pagination}>
-                {historyWithStats.map((_, i) => (
-                  <View
-                    key={i}
-                    style={[styles.dot, i === historyIndex && styles.dotActive]}
-                  />
-                ))}
-              </View>
-            )}
-          </>
+          <View style={styles.historyListVertical}>
+            {historyWithStats.map(item => (
+              <HistoryItem
+                key={item.id}
+                event={item}
+                onPress={() => router.push(`/event/${item.id}`)}
+                showActions={false}
+              />
+            ))}
+          </View>
         )}
       </ScrollView>
 
@@ -370,33 +341,9 @@ const styles = StyleSheet.create({
   sectionLink: { color: '#6366F1', fontSize: 13, fontWeight: '600' },
 
   // History list
-  historyList: {
+  historyListVertical: {
     paddingHorizontal: 20,
     gap: 12,
-  },
-  historyItem: {
-    width: CARD_WIDTH,
-  },
-
-  // Pagination dots
-  pagination: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#1E293B',
-  },
-  dotActive: {
-    width: 20,
-    backgroundColor: '#6366F1',
-    borderRadius: 3,
   },
 
   // Empty state
