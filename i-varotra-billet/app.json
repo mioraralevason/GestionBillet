@@ -13,7 +13,10 @@
     },
     "android": {
       "package": "com.ivarotra.billet",
-      "allowedLocales": ["fr-FR", "en-US"],
+      "allowedLocales": [
+        "fr-FR",
+        "en-US"
+      ],
       "ndk": "27.2.12479018",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -42,7 +45,10 @@
             "enableShrinkResources": true,
             "androidJsBundleLoader": "normal",
             "extraProguardRules": "-keep class com.facebook.react.** { *; }\n-keep class com.swmansion.** { *; }",
-            "buildArchs": ["arm64-v8a", "armeabi-v7a"]
+            "buildArchs": [
+              "arm64-v8a",
+              "armeabi-v7a"
+            ]
           }
         }
       ],
@@ -75,8 +81,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "6857ed27-d112-4357-b4d3-cf992d02b139"
+        "projectId": "f03b46b0-40c0-4682-8e6c-54bbbf739891"
       }
-    }
+    },
+    "owner": "ralevasonmiora"
   }
 }
