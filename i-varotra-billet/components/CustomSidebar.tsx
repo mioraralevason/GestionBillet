@@ -129,13 +129,15 @@ export const CustomSidebar: React.FC<SidebarProps> = ({ isOpen, onClose, role })
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('(tabs)/buyers')}>
-            <MaterialCommunityIcons name="account-group-outline" size={24} color="#8B5CF6" style={styles.menuIcon} />
-            <View style={styles.menuTextContainer}>
-              <Text style={styles.menuLabel}>Acheteurs</Text>
-              <Text style={styles.menuSubtitle}>Liste des clients</Text>
-            </View>
-          </TouchableOpacity>
+          {role !== 'verificateur' && (
+            <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('(tabs)/buyers')}>
+              <MaterialCommunityIcons name="account-group-outline" size={24} color="#8B5CF6" style={styles.menuIcon} />
+              <View style={styles.menuTextContainer}>
+                <Text style={styles.menuLabel}>Acheteurs</Text>
+                <Text style={styles.menuSubtitle}>Liste des clients</Text>
+              </View>
+            </TouchableOpacity>
+          )}
 
           <View style={styles.divider} />
 

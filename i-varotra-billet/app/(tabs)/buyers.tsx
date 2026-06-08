@@ -8,6 +8,8 @@ import { useFocusEffect, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ConfirmModal from '../../components/ConfirmModal';
 import ToastMessage from '../../components/ToastMessage';
+import { useRole } from '../../hooks/useRole';
+import { FAB } from '../../components/ui/FAB';
 
 const { width } = Dimensions.get('window');
 
@@ -19,7 +21,7 @@ export default function BuyersList() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastConfig, setToastConfig] = useState<{ title: string; message?: string; type: 'success' | 'error' | 'warning' | 'info' }>({ title: '', type: 'info' });
-  const [role, setRole] = useState<string | null>(null);
+  const { role, isVerifier } = useRole();
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState('');
@@ -31,15 +33,9 @@ export default function BuyersList() {
     setBuyers(list);
   }, []);
 
-  const fetchRole = useCallback(async () => {
-    const userRole = await AsyncStorage.getItem('userRole');
-    setRole(userRole);
-  }, []);
-
   useFocusEffect(useCallback(() => {
     fetchBuyers();
-    fetchRole();
-  }, [fetchBuyers, fetchRole]));
+  }, [fetchBuyers]));
 
   const filteredBuyers = useMemo(() => {
     if (!search.trim()) return buyers;
@@ -92,20 +88,22 @@ export default function BuyersList() {
         )}
       </View>
       <View style={styles.actions}>
-        {role !== 'verificateur' && (
+        {!isVerifier && (
           <>
             <TouchableOpacity onPress={() => openModal(item)} style={styles.actionBtn}>
               <MaterialCommunityIcons name="pencil" size={20} color="#6366F1" />
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                setBuyerToDelete(item);
-                setDeleteModalVisible(true);
-              }}
-              style={styles.actionBtn}
-            >
-              <MaterialCommunityIcons name="trash-can-outline" size={20} color="#EF4444" />
-            </TouchableOpacity>
+            {role === 'admin' && (
+              <TouchableOpacity
+                onPress={() => {
+                  setBuyerToDelete(item);
+                  setDeleteModalVisible(true);
+                }}
+                style={styles.actionBtn}
+              >
+                <MaterialCommunityIcons name="trash-can-outline" size={20} color="#EF4444" />
+              </TouchableOpacity>
+            )}
           </>
         )}
       </View>
@@ -135,9 +133,16 @@ export default function BuyersList() {
             </View>
           ) : 'Acheteurs',
           headerRight: () => (
-            <TouchableOpacity onPress={() => setIsSearchActive(!isSearchActive)} style={{ marginRight: 20 }}>
-              <MaterialCommunityIcons name={isSearchActive ? "close" : "magnify"} size={26} color="#FFFFFF" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 10 }}>
+              <TouchableOpacity onPress={() => setIsSearchActive(!isSearchActive)} style={{ marginRight: 15 }}>
+                <MaterialCommunityIcons name={isSearchActive ? "close" : "magnify"} size={26} color="#FFFFFF" />
+              </TouchableOpacity>
+              {!isSearchActive && !isVerifier && (
+                <TouchableOpacity onPress={() => openModal()} style={{ marginRight: 10 }}>
+                  <MaterialCommunityIcons name="account-plus" size={26} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+            </View>
           )
         }}
       />
@@ -155,10 +160,12 @@ export default function BuyersList() {
         }
       />
 
-      {role !== 'verificateur' && (
-        <TouchableOpacity style={styles.fab} onPress={() => openModal()}>
-          <MaterialCommunityIcons name="account-plus" size={30} color="#000" />
-        </TouchableOpacity>
+      {!isVerifier && (
+        <FAB
+          icon="account-plus"
+          onPress={() => openModal()}
+          style={styles.fab}
+        />
       )}
 
       <Modal visible={modalVisible} animationType="slide" transparent>
@@ -241,7 +248,7 @@ const styles = StyleSheet.create({
   phone: { color: '#94A3B8', fontSize: 14 },
   actions: { flexDirection: 'row', gap: 10 },
   actionBtn: { padding: 8, backgroundColor: '#1E293B', borderRadius: 12 },
-  fab: { position: 'absolute', right: 25, bottom: 30, backgroundColor: '#A5B4FC', width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 8 },
+  fab: { position: 'absolute', right: 25, bottom: 100 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 },
   emptyText: { marginTop: 20, fontSize: 16, color: '#64748B' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
@@ -256,3 +263,4 @@ const styles = StyleSheet.create({
   btnAdd: { flex: 2, backgroundColor: '#6366F1', padding: 18, borderRadius: 15, alignItems: 'center' },
   btnTextAdd: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 }
 });
+

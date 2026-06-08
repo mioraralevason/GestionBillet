@@ -7,23 +7,27 @@ import { CustomSidebar } from '../../components/CustomSidebar';
 
 const { width } = Dimensions.get('window');
 
-function MyTabBar({ state, descriptors, navigation }: any) {
+interface MyTabBarProps {
+  state: any;
+  descriptors: any;
+  navigation: any;
+  role: string | null;
+}
+
+function MyTabBar({ state, descriptors, navigation, role }: MyTabBarProps) {
+  // FILTRE STRICT : On n'affiche QUE ces routes là (buyers pour admin uniquement)
+  const allowedRoutes = role !== 'verificateur'
+    ? ['home', 'events', 'verifier', 'buyers'] 
+    : ['home', 'events', 'verifier'];
+
+  const filteredRoutes = state.routes.filter((route: any) => allowedRoutes.includes(route.name));
+
   return (
     <View style={styles.tabBarContainer}>
       <View style={styles.tabBar}>
-        {state.routes.map((route: any, index: number) => {
+        {filteredRoutes.map((route: any) => {
           const { options } = descriptors[route.key];
-          const isFocused = state.index === index;
-
-          // FILTRE STRICT : On n'affiche QUE ces 3 routes là
-          if (!['home', 'events', 'verifier'].includes(route.name)) return null;
-
-          const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          };
+          const isFocused = state.index === state.routes.findIndex((r: any) => r.key === route.key);
 
           let iconName: any = 'home-outline';
           let labelText = 'Accueil';
@@ -37,7 +41,17 @@ function MyTabBar({ state, descriptors, navigation }: any) {
           } else if (route.name === 'verifier') {
             iconName = 'qrcode-scan';
             labelText = 'Scan';
+          } else if (route.name === 'buyers') {
+            iconName = isFocused ? 'account-group' : 'account-group-outline';
+            labelText = 'Acheteurs';
           }
+
+          const onPress = () => {
+            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
 
           return (
             <TouchableOpacity
@@ -77,7 +91,7 @@ export default function TabsLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: '#000000' }}>
       <Tabs 
-        tabBar={props => <MyTabBar {...props} />}
+        tabBar={(props: any) => <MyTabBar {...props} role={role} />}
         screenOptions={{ 
           headerShown: true,
           headerStyle: { backgroundColor: '#000000', elevation: 0, shadowOpacity: 0, borderBottomWidth: 1, borderBottomColor: '#1E293B' },
@@ -104,7 +118,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="events" options={{ title: 'Événements' }} />
         <Tabs.Screen name="verifier" options={{ title: 'Scanner' }} />
         <Tabs.Screen name="calendar" options={{ href: null }} />
-        <Tabs.Screen name="buyers" options={{ href: null }} />
+        <Tabs.Screen name="buyers" />
       </Tabs>
 
       <CustomSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} role={role} />

@@ -206,6 +206,15 @@ export default function EventsList() {
         />
       )}
 
+      {role !== 'verificateur' && (
+        <FAB
+          icon="account-plus"
+          onPress={() => router.push('/(tabs)/buyers')}
+          backgroundColor="#8B5CF6"
+          style={styles.buyerFab}
+        />
+      )}
+
       <ConfirmModal
         visible={confirmVisible}
         title="Supprimer l'événement"
@@ -267,5 +276,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     bottom: 100,
+  },
+  buyerFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    backgroundColor: '#8B5CF6',
   },
 });
